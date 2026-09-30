@@ -1,0 +1,1757 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><title>House BIM Studio</title></head><body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: engineering workbench — project rail at left, tabbed work area, KPI strip on top. Drawing-sheet feel: hairline grids, mono figures. */
+:root{
+  --bg:#EEF1F0; --surface:#FFFFFF; --sunk:#F6F8F7; --ink:#15201C; --muted:#56655F; --line:#D3DBD8; --line2:#E6ECEA;
+  --accent:#1D5C86; --accent-ink:#FFFFFF; --accent-soft:#E3EDF4;
+  --crit:#B3261E; --ok:#2B7A4B; --warn:#9A5B00;
+  --c-S:#5B6770; --c-A:#A8652F; --c-P:#1F7A80; --c-E:#B08900;
+  --gantt:#3E7CA8; --scene:#E9EDEC;
+  --f-body:"IBM Plex Sans Thai",system-ui,"Leelawadee UI","Tahoma",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"Consolas",monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101614; --surface:#172020; --sunk:#131B1A; --ink:#E4EBE8; --muted:#9AABA4; --line:#2C3A37; --line2:#223030;
+  --accent:#6FAED8; --accent-ink:#0C1A22; --accent-soft:#1B2E3A;
+  --crit:#F08A80; --ok:#6CC596; --warn:#E0A64A;
+  --c-S:#A3B1BA; --c-A:#DB9A62; --c-P:#5CC3C9; --c-E:#E2C24E; --gantt:#6FAED8; --scene:#1A2322; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101614; --surface:#172020; --sunk:#131B1A; --ink:#E4EBE8; --muted:#9AABA4; --line:#2C3A37; --line2:#223030;
+  --accent:#6FAED8; --accent-ink:#0C1A22; --accent-soft:#1B2E3A;
+  --crit:#F08A80; --ok:#6CC596; --warn:#E0A64A;
+  --c-S:#A3B1BA; --c-A:#DB9A62; --c-P:#5CC3C9; --c-E:#E2C24E; --gantt:#6FAED8; --scene:#1A2322; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100vh}
+@media (max-width:860px){.app{grid-template-columns:minmax(0,1fr)}.rail{border-right:0;border-bottom:1px solid var(--line)}}
+.rail{background:var(--surface);border-right:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand b{font-size:16px;letter-spacing:.01em}
+.brand span{color:var(--muted);font-size:12px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.plist{display:flex;flex-direction:column;gap:4px}
+.pitem{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:8px 10px;border:1px solid transparent;border-radius:var(--r);background:none;cursor:pointer;min-width:0}
+.pitem:hover{background:var(--sunk)}
+.pitem.on{border-color:var(--accent);background:var(--accent-soft)}
+.pitem small{color:var(--muted);font-size:11.5px}
+.pitem span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.btnrow{display:flex;flex-wrap:wrap;gap:6px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:6px 11px;cursor:pointer;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.warn{color:var(--crit)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn:focus-visible,.tab:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.pitem:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.note{font-size:12px;color:var(--muted)}
+.main{min-width:0;display:flex;flex-direction:column}
+.top{padding-block:14px;padding-inline:20px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:12px;min-width:0}
+.titlebar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.pname{font-size:19px;font-weight:600;border:1px solid transparent;border-radius:var(--r);padding:2px 6px;background:none;min-width:0;width:min(520px,100%)}
+.pname:hover{border-color:var(--line)}
+.status{font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.dot.ok{background:var(--ok)}.dot.dirty{background:var(--warn)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.kpi{padding:8px 12px;border-right:1px solid var(--line2);min-width:0}
+.kpi:last-child{border-right:0}
+.kpi .l{font-size:11.5px;color:var(--muted)}
+.kpi .v{font-family:var(--f-mono);font-size:17px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.kpi .s{font-size:11.5px;color:var(--muted)}
+.tabs{display:flex;gap:2px;overflow-x:auto;padding-inline:20px;background:var(--surface);border-bottom:1px solid var(--line)}
+.tab{border:0;background:none;padding:10px 12px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.work{padding-block:18px;padding-inline:20px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;min-width:0}
+.panel h3{margin:0 0 10px;font-size:15px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.scroll{overflow-x:auto;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border-bottom:1px solid var(--line2);padding:5px 8px;text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;position:sticky;top:0;background:var(--surface)}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.cat td{background:var(--accent-soft);font-weight:600}
+tr.sub td{background:var(--sunk);font-weight:600}
+tr.tot td{font-weight:600;border-top:1px solid var(--line)}
+td input{width:86px;border:1px solid var(--line);border-radius:4px;padding:2px 5px;background:var(--sunk);text-align:right;font-family:var(--f-mono);font-size:12.5px}
+td input.w{width:52px}
+td input.t{width:120px;text-align:left}
+.basis{color:var(--muted);font-size:12px;max-width:420px}
+.pill{display:inline-block;font-size:11.5px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.pill.crit{color:var(--crit);border-color:var(--crit)}
+.pill.ok{color:var(--ok);border-color:var(--ok)}
+.pill.warn{color:var(--warn);border-color:var(--warn)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px 16px}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field label{font-size:12px;color:var(--muted)}
+.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;background:var(--sunk);min-width:0}
+textarea.json{width:100%;min-height:420px;font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);border-radius:var(--r);padding:10px;background:var(--sunk);white-space:pre;overflow:auto}
+.err{color:var(--crit);font-size:13px;white-space:pre-wrap}
+.viewer{position:relative;height:min(68vh,640px);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--scene)}
+.viewer canvas{display:block;width:100%;height:100%}
+.vtools{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.vtools label{display:flex;gap:5px;align-items:center;font-size:13px;cursor:pointer}
+.info{position:absolute;right:10px;top:10px;max-width:min(340px,calc(100% - 20px));max-height:calc(100% - 20px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;font-size:12.5px}
+.info h4{margin:0 0 6px;font-size:14px}
+.info dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;margin:0}
+.info dt{color:var(--muted)}.info dd{margin:0;word-break:break-word}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+svg text{font-family:var(--f-body)}
+.bar{display:flex;height:12px;border-radius:3px;overflow:hidden;border:1px solid var(--line)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.checks td:last-child{white-space:nowrap}
+.hide{display:none!important}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><b>House BIM Studio</b><span>บ้าน · ท่อลอดคลองส่งน้ำ — ข้อมูลแบบ → โมเดล → BOQ → แผนงาน → S-Curve</span></div>
+    <div>
+      <div class="eyebrow">โครงการที่บันทึกไว้</div>
+      <div class="plist" id="plist"></div>
+      <p class="note" id="dbnote">กำลังเชื่อมที่เก็บข้อมูล…</p>
+    </div>
+    <div class="btnrow">
+      <button class="btn pri" id="bSave">บันทึก</button>
+      <button class="btn" id="bNew" data-tpl="house">ใหม่: บ้าน TYPE03</button>
+      <button class="btn" id="bNewC" data-tpl="culvert">ใหม่: ท่อลอดคลอง มฐ04-62</button>
+      <button class="btn" id="bDup">ทำสำเนา</button>
+      <label class="btn" for="fImport">นำเข้า JSON</label>
+      <input type="file" id="fImport" accept=".json,application/json" class="hide">
+      <button class="btn warn" id="bDel">ลบ</button>
+    </div>
+    <p class="note">ตัวเลขสีน้ำเงินในตารางแก้ไขได้ ผลทุกหน้าคำนวณใหม่ทันที ข้อมูลรูปทรงทั้งหมดแก้ได้ที่แท็บ “ข้อมูลแบบ”</p>
+  </aside>
+  <main class="main">
+    <header class="top">
+      <div class="titlebar">
+        <input class="pname" id="pname" aria-label="ชื่อโครงการ">
+        <div class="status"><span class="dot" id="sdot"></span><span id="stext">แม่แบบ ยังไม่บันทึก</span></div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+    </header>
+    <nav class="tabs" id="tabs" role="tablist"></nav>
+    <section class="work" id="work"></section>
+  </main>
+</div>
+
+<script src="local-caps.js"></script>
+<script src="vendor/three.min.js"></script>
+<script src="vendor/OrbitControls.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script id="tpl-type03" type="application/json">{"schema":"house-bim-spec/1","name":"TYPE03 บ้านโอบกอด (ธอส.)","meta":{"source":"แบบ ธอส. TYPE03 คสล. 1 ชั้น ลงวันที่ 30/07/2566 (30 หน้า)","refEstimate":1870000,"grossArea":100.0},"grid":{"x":{"1":0.0,"2":6.0,"3":11.0,"4":15.0},"y":{"A":12.0,"B":10.0,"C":6.0,"D":2.0,"E":0.0}},"levels":{"ffl":0.7,"beamTop":0.55,"footingTop":-0.3,"bath":0.65,"ceilWest":3.6,"ceilEast":3.5,"ceilBath":3.25},"foundation":{"footing":{"mark":"F1","b":0.7,"h":0.7,"barsDB16":10,"barLen":1.12,"ringRB9":2},"pile":{"mark":"I18x18","size":0.18,"length":8.0,"safeLoad_t":15,"embed":0.05},"exc":{"margin":0.3,"sand":0.1,"lean":0.05,"padSize":0.9}},"columns":{"lower":{"size":0.3,"bars":4,"bar":"DB12","extra":0.9,"tie":0.98},"upper":{"size":0.2,"bars":4,"bar":"DB12","extra":0.5,"tie":0.58},"topOverride":{"E3":3.31,"E4":3.31}},"beamSections":{"B1":{"b":0.2,"d":0.4,"bars":"2-DB12 / 2-DB12","stirrup":"RB9@0.15"},"B2":{"b":0.2,"d":0.4,"bars":"2-DB16+1-DB16 / 2-DB16","stirrup":"RB9@0.15"},"B2C":{"b":0.2,"d":0.4,"bars":"2-DB16+2-DB16 / 2-DB20","stirrup":"RB9@0.15"},"B3":{"b":0.2,"d":0.5,"bars":"3-DB16+2-DB16 / 2-DB16","stirrup":"RB9@0.15"},"B3C":{"b":0.2,"d":0.5,"bars":"3-DB16+2-DB16 / 2-DB16","stirrup":"RB9@0.15"},"B1C":{"b":0.2,"d":0.4,"bars":"2-DB12 / 2-DB12","stirrup":"RB9@0.15"},"B4":{"b":0.2,"d":0.6,"bars":"4-DB16+2-DB16 / 4-DB16","stirrup":"RB9@0.15"},"B4C":{"b":0.2,"d":0.6,"bars":"4-DB16+2-DB16 / 4-DB16","stirrup":"RB9@0.15"}},"beamEqBars":{"B1":{"DB12":4},"B1C":{"DB12":4},"B2":{"DB16":5.1},"B2C":{"DB16":5,"DB20":1},"B3":{"DB16":7},"B3C":{"DB16":6},"B4":{"DB16":10},"B4C":{"DB16":10}},"beams":[["B3","x",12.0,0.15,5.85,"B3-A-1"],["B4","x",10.0,0.15,5.85,"B4-B-1"],["B3","x",10.0,6.15,10.85,"B3-B-2"],["B3","x",10.0,11.15,14.85,"B3-B-3"],["B3","x",12.0,11.15,14.85,"B3-A-3"],["B4","x",6.0,0.15,5.85,"B4-C-1"],["B4C","x",6.0,6.15,7.3,"B4C-C-2"],["B3C","x",6.0,9.7,10.85,"B3C-C-3"],["B3","x",6.0,11.15,14.85,"B3-C-4"],["B4","x",2.0,0.15,5.85,"B4-D-1"],["B4C","x",2.0,6.15,7.3,"B4C-D-2"],["B3C","x",2.0,9.7,10.85,"B3C-D-3"],["B3","x",2.0,11.15,14.85,"B3-D-4"],["B3","x",0.0,0.15,5.85,"B3-E-1"],["B3C","x",0.0,6.15,7.3,"B3C-E-2"],["B1C","x",0.0,9.7,10.85,"B1C-E-3"],["B1","x",0.0,11.15,14.85,"B1-E-4"],["B1","x",8.0,7.3,9.7,"B1-S-1"],["B1","y",0.0,10.15,11.85,"B1-x0-A"],["B2","y",0.0,6.15,9.85,"B2-x0-B"],["B2","y",0.0,2.15,5.85,"B2-x0-C"],["B2","y",0.0,0.15,1.85,"B2-x0-D"],["B1","y",2.1,10.15,11.85,"B1-x2.1"],["B2","y",2.8,0.15,1.85,"B2-x2.8"],["B2","y",6.0,10.15,11.85,"B2-x6-A"],["B2","y",6.0,6.15,9.85,"B2-x6-B"],["B2","y",6.0,2.15,5.85,"B2-x6-C"],["B2","y",6.0,0.15,1.85,"B2-x6-D"],["B1","y",7.2,0.0,7.9,"B1-x7.2-a"],["B2","y",7.2,8.1,9.85,"B2-x7.2-b"],["B1","y",9.8,2.0,7.9,"B1-x9.8-a"],["B2","y",9.8,8.1,9.85,"B2-x9.8-b"],["B2","y",11.0,2.15,5.85,"B2-x11-C"],["B2","y",11.0,6.15,9.85,"B2-x11-B"],["B2","y",11.0,10.15,11.85,"B2-x11-A"],["B1","y",11.0,0.15,1.85,"B1-x11-D"],["B2","y",12.8,10.15,11.85,"B2-x12.8"],["B2","y",15.0,2.15,5.85,"B2-x15-C"],["B2","y",15.0,6.15,9.85,"B2-x15-B"],["B2","y",15.0,10.15,11.85,"B2-x15-A"],["B1","y",15.0,0.15,1.85,"B1-x15-D"]],"slabs":[["PS","PS-W1",0.05,5.95,6.1,9.9,0.55,0.7],["PS","PS-W2",0.05,5.95,2.1,5.9,0.55,0.7],["PS","PS-laundry",2.25,5.95,10.1,11.9,0.55,0.7],["PS","PS-E0",11.05,12.75,10.1,11.9,0.55,0.7],["PS","PS-E1",11.05,14.95,6.1,9.9,0.55,0.7],["PS","PS-E2",11.05,14.95,2.1,5.9,0.55,0.7],["S1","S1-bath1",0.15,2.0,10.1,11.9,0.45,0.55],["S1","S1-bath2",12.9,14.85,10.1,11.9,0.45,0.55],["S1","S1-terrace-a",0.1,2.7,0.1,1.9,0.45,0.55],["S1","S1-terrace-b",2.9,5.9,0.1,1.9,0.45,0.55],["S1","S1-deckW-1",6.1,7.1,6.1,9.9,0.45,0.55],["S1","S1-deckW-2",6.1,7.1,2.1,5.9,0.45,0.55],["S1","S1-deckW-3",6.1,7.1,0.1,1.9,0.45,0.55],["S1","S1-deckE-1",9.9,10.9,6.1,9.9,0.45,0.55],["S1","S1-deckE-2",9.9,10.9,2.1,5.9,0.45,0.55],["S1","S1-garden",7.3,9.7,8.1,9.9,0.45,0.55]],"stairs":[{"name":"ST1","x0":0.0,"x1":7.2,"edge":-0.15,"dir":-1},{"name":"ST2","x0":2.15,"x1":5.85,"edge":12.15,"dir":1}],"walls":[{"id":"W-x0-DC","mark":"P1","axis":"y","c":0.0,"a":2.1,"b":5.9,"top":"roof:R1","ridge":false,"openings":[{"unit":"AW1","name":"AW1-W1","c":2.45},{"unit":"AW1","name":"AW1-W2","c":5.5}],"note":""},{"id":"W-x0-CB","mark":"P1","axis":"y","c":0.0,"a":6.1,"b":9.9,"top":"roof:R1","ridge":false,"openings":[{"unit":"AW2","name":"AW2-W1","c":6.85},{"unit":"AW2","name":"AW2-W2","c":9.2}],"note":""},{"id":"W-x0-BA","mark":"P1","axis":"y","c":0.0,"a":10.1,"b":11.9,"top":"roof:R1","ridge":false,"openings":[{"unit":"AW3","name":"AW3-BATH1","c":11.0,"floor":0.65}],"note":"Inside: P3 tile (bath 1)"},{"id":"W-x6-DC","mark":"P1","axis":"y","c":6.0,"a":2.1,"b":5.9,"top":"roof:R1","ridge":false,"openings":[{"unit":"D2","name":"D2-1","a":2.1,"b":5.9}],"note":""},{"id":"W-x6-CB","mark":"P1","axis":"y","c":6.0,"a":6.1,"b":9.9,"top":"roof:R1","ridge":false,"openings":[{"unit":"D2","name":"D2-2","a":6.1,"b":9.9}],"note":""},{"id":"W-y2-gable","mark":"P1","axis":"x","c":2.0,"a":0.1,"b":5.9,"top":"roof:R1","ridge":true,"openings":[{"unit":"D1","name":"D1","a":0.1,"b":5.9}],"note":""},{"id":"W-y10","mark":"P2","axis":"x","c":10.0,"a":0.1,"b":5.9,"top":"ceilWest","ridge":false,"openings":[{"unit":"D5","name":"D5-BATH1","a":1.4,"b":2.15},{"unit":"D3","name":"D3","a":3.3,"b":5.9}],"note":"stops at ceiling (ASSUMED)"},{"id":"W-x2.2-bath1","mark":"P3","axis":"y","c":2.2,"a":10.05,"b":11.95,"top":"ceilWest","ridge":false,"openings":[],"note":""},{"id":"W-y12-gable","mark":"P1","axis":"x","c":12.0,"a":0.1,"b":5.9,"top":"roof:R1","ridge":true,"openings":[{"void":true,"a":2.3,"b":5.9,"zs":0.7,"zh":3.7}],"note":"laundry side open to rear stair ST2 (A-07 elev. 3)"},{"id":"E-x11-DC","mark":"P1","axis":"y","c":11.0,"a":2.1,"b":5.9,"top":"roof:R2","ridge":false,"openings":[{"unit":"D4","name":"D4-BED2","a":4.75,"b":5.85}],"note":""},{"id":"E-x11-CB","mark":"P1","axis":"y","c":11.0,"a":6.1,"b":9.9,"top":"roof:R2","ridge":false,"openings":[{"unit":"D4","name":"D4-BED1","a":6.15,"b":7.25}],"note":""},{"id":"E-x11-BA","mark":"P1","axis":"y","c":11.0,"a":10.1,"b":11.9,"top":"roof:R2","ridge":false,"openings":[],"note":""},{"id":"E-x15-DC","mark":"P1","axis":"y","c":15.0,"a":2.1,"b":5.9,"top":"roof:R2","ridge":false,"openings":[{"unit":"AW1","name":"AW1-E1","c":2.45},{"unit":"AW1","name":"AW1-E2","c":5.55}],"note":""},{"id":"E-x15-CB","mark":"P1","axis":"y","c":15.0,"a":6.1,"b":9.9,"top":"roof:R2","ridge":false,"openings":[{"unit":"AW1","name":"AW1-E3","c":6.45},{"unit":"AW1","name":"AW1-E4","c":9.55}],"note":""},{"id":"E-x15-BA","mark":"P1","axis":"y","c":15.0,"a":10.1,"b":11.9,"top":"roof:R2","ridge":false,"openings":[{"unit":"AW3","name":"AW3-BATH2","c":11.0,"floor":0.65}],"note":"Inside: P3 tile (bath 2)"},{"id":"E-y2-gable","mark":"P1","axis":"x","c":2.0,"a":11.1,"b":14.9,"top":"roof:R2","ridge":true,"openings":[{"unit":"AW4","name":"AW4","c":13.25}],"note":""},{"id":"E-y6","mark":"P2","axis":"x","c":6.0,"a":11.1,"b":14.9,"top":"ceilEast","ridge":false,"openings":[],"note":"stops at ceiling (ASSUMED)"},{"id":"E-y10-bath2","mark":"P2","axis":"x","c":10.0,"a":12.75,"b":14.9,"top":"ceilEast","ridge":false,"openings":[{"unit":"D5","name":"D5-BATH2","a":12.9,"b":13.65}],"note":""},{"id":"E-x12.8-bath2","mark":"P3","axis":"y","c":12.8,"a":10.05,"b":11.95,"top":"ceilEast","ridge":false,"openings":[],"note":""},{"id":"E-y12-gable","mark":"P1","axis":"x","c":12.0,"a":11.1,"b":14.9,"top":"roof:R2","ridge":true,"openings":[{"unit":"AW1","name":"AW1-N","c":12.0}],"note":""}],"screens":[{"name":"AW5-a","mark":"AW5","y":0.0,"x0":9.75,"x1":10.9,"zb":0.55,"zt":3.31,"desc":"AW5 screen on B1C (drawn 5.30x3.09 from ground; top set to column top +3.31)"},{"name":"AW5-b","mark":"AW5","y":0.0,"x0":11.1,"x1":14.9,"zb":0.55,"zt":3.31,"desc":"AW5 screen on B1 (drawn 5.30x3.09 from ground; top set to column top +3.31)"},{"name":"AW6","mark":"AW6","y":10.0,"x0":6.1,"x1":10.9,"zb":0.55,"zt":3.21,"desc":"AW6 screen on B3 (drawn 4.80x2.76; capped under deck-roof I-beam)"}],"louvres":[{"name":"LOUVRE-A-laundry","axis":"x","c":12.0,"a":2.35,"b":3.3,"pitch":0.1,"w":0.025,"d":0.08,"zb":0.7,"zt":3.7,"desc":"Vertical timber louvre 25x80 @100 (read from A-07 elev. 3; size ASSUMED)"}],"floors":[{"name":"F2-multipurpose","mark":"F2","x0":0.1,"x1":5.9,"y0":2.1,"y1":9.9,"zb":0.7,"zt":0.71,"mat":"tile_floor","desc":"Granito tile 24\"x24\" on topping"},{"name":"F2-bed1","mark":"F2","x0":11.1,"x1":14.9,"y0":6.1,"y1":9.9,"zb":0.7,"zt":0.71,"mat":"tile_floor","desc":"Granito tile 24\"x24\" on topping"},{"name":"F2-bed1-alcove","mark":"F2","x0":11.1,"x1":12.7,"y0":10.1,"y1":11.9,"zb":0.7,"zt":0.71,"mat":"tile_floor","desc":"Granito tile 24\"x24\" on topping"},{"name":"F2-bed2","mark":"F2","x0":11.1,"x1":14.9,"y0":2.1,"y1":5.9,"zb":0.7,"zt":0.71,"mat":"tile_floor","desc":"Granito tile 24\"x24\" on topping"},{"name":"F3-bath1","mark":"F3","x0":0.1,"x1":2.15,"y0":10.1,"y1":11.9,"zb":0.55,"zt":0.65,"mat":"tile_bath","desc":"Screed + glazed anti-slip tile 8\"x8\" (FFL +0.65, fall to FD)"},{"name":"F3-bath2","mark":"F3","x0":12.85,"x1":14.9,"y0":10.1,"y1":11.9,"zb":0.55,"zt":0.65,"mat":"tile_bath","desc":"Screed + glazed anti-slip tile 8\"x8\" (FFL +0.65, fall to FD)"},{"name":"F4-terrace-a","mark":"F4","x0":0.1,"x1":2.7,"y0":0.1,"y1":1.9,"zb":0.55,"zt":0.6,"mat":"deck","desc":"Fibre-cement plank decking (FFL +0.60)"},{"name":"F4-terrace-b","mark":"F4","x0":2.9,"x1":5.9,"y0":0.1,"y1":1.9,"zb":0.55,"zt":0.6,"mat":"deck","desc":"Fibre-cement plank decking (FFL +0.60)"},{"name":"F4-deckW-3","mark":"F4","x0":6.1,"x1":7.1,"y0":0.1,"y1":1.9,"zb":0.55,"zt":0.6,"mat":"deck","desc":"Fibre-cement plank decking (FFL +0.60)"},{"name":"F4-deckW-2","mark":"F4","x0":6.1,"x1":7.1,"y0":2.1,"y1":5.9,"zb":0.55,"zt":0.6,"mat":"deck","desc":"Fibre-cement plank decking (FFL +0.60)"},{"name":"F4-deckW-1","mark":"F4","x0":6.1,"x1":7.1,"y0":6.1,"y1":9.9,"zb":0.55,"zt":0.6,"mat":"deck","desc":"Fibre-cement plank decking (FFL +0.60)"},{"name":"F4-deckE-2","mark":"F4","x0":9.9,"x1":10.9,"y0":2.1,"y1":5.9,"zb":0.55,"zt":0.6,"mat":"deck","desc":"Fibre-cement plank decking (FFL +0.60)"},{"name":"F4-deckE-1","mark":"F4","x0":9.9,"x1":10.9,"y0":6.1,"y1":9.9,"zb":0.55,"zt":0.6,"mat":"deck","desc":"Fibre-cement plank decking (FFL +0.60)"},{"name":"F4-garden-deck","mark":"F4","x0":7.3,"x1":9.7,"y0":8.1,"y1":9.9,"zb":0.55,"zt":0.6,"mat":"deck","desc":"Fibre-cement plank decking (FFL +0.60)"},{"name":"F4-laundry","mark":"F4","x0":2.3,"x1":5.9,"y0":10.1,"y1":11.9,"zb":0.7,"zt":0.71,"mat":"deck","desc":"Fibre-cement plank decking (FFL +0.60)","note":"A-03 says +0.60 but S-05 shows PS slab (+0.70) - to confirm"}],"ceilings":[{"name":"C1-multipurpose","mark":"C1","x0":0.1,"x1":5.9,"y0":2.1,"y1":9.9,"zb":3.6,"zt":3.61,"mat":"ceiling","desc":"SCG SmartBoard 4 mm, galvanised grid, SCG Stay Cool 75 mm insulation"},{"name":"C1-laundry","mark":"C1","x0":2.3,"x1":5.9,"y0":10.1,"y1":11.9,"zb":3.6,"zt":3.61,"mat":"ceiling","desc":"SCG SmartBoard 4 mm, galvanised grid, SCG Stay Cool 75 mm insulation"},{"name":"C1-bed1","mark":"C1","x0":11.1,"x1":14.9,"y0":6.1,"y1":9.9,"zb":3.5,"zt":3.51,"mat":"ceiling","desc":"SCG SmartBoard 4 mm, galvanised grid, SCG Stay Cool 75 mm insulation"},{"name":"C1-bed1-alcove","mark":"C1","x0":11.1,"x1":12.7,"y0":10.1,"y1":11.9,"zb":3.5,"zt":3.51,"mat":"ceiling","desc":"SCG SmartBoard 4 mm, galvanised grid, SCG Stay Cool 75 mm insulation"},{"name":"C1-bed2","mark":"C1","x0":11.1,"x1":14.9,"y0":2.1,"y1":5.9,"zb":3.5,"zt":3.51,"mat":"ceiling","desc":"SCG SmartBoard 4 mm, galvanised grid, SCG Stay Cool 75 mm insulation"},{"name":"C2-bath1","mark":"C2","x0":0.1,"x1":2.15,"y0":10.1,"y1":11.9,"zb":3.25,"zt":3.26,"mat":"ceiling","desc":"SCG SmartBoard 4 mm moisture-resistant, galvanised grid, Stay Cool 75 mm"},{"name":"C2-bath2","mark":"C2","x0":12.85,"x1":14.9,"y0":10.1,"y1":11.9,"zb":3.25,"zt":3.26,"mat":"ceiling","desc":"SCG SmartBoard 4 mm moisture-resistant, galvanised grid, Stay Cool 75 mm"}],"roofStack":{"purlin":0.05,"rafter":0.1,"primary":0.15,"purlinDrop":0.012,"spacing":1.0},"stairLevels":[0.45,0.3,0.15],"stairTread":0.3,"roofs":{"gables":[{"tag":"R1","ridgeX":4.0,"ridgeZ":5.55,"eaveZ":4.0,"eaveDX":4.0,"xL":-1.0,"xR":7.0,"y0":-1.0,"y1":13.0,"frames":[0.0,2.0,6.0,10.0,12.0],"eaveLines":[0.0,6.0],"sheetName":"R1-W","cover":"R1","coverDesc":"SCG fibre-cement double-roman \"Hybrid\" (R1)"},{"tag":"R2","ridgeX":12.7,"ridgeZ":4.76,"eaveZ":3.9,"eaveDX":2.3,"xL":10.0,"xR":16.0,"y0":1.0,"y1":13.0,"frames":[2.0,6.0,10.0,12.0],"eaveLines":[11.0,15.0],"sheetName":"R1-E","cover":"R1","coverDesc":"SCG fibre-cement double-roman \"Hybrid\" (R1)"}],"deck":{"z0":3.5,"deg":3.0,"xa":6.0,"xb":11.0,"ew":[[10.0,6.1,8.5,"DK-EW-y10-L"],[10.0,8.5,10.9,"DK-EW-y10-R"],[8.0,6.1,8.5,"DK-EW-y8-L"],[8.0,8.5,10.9,"DK-EW-y8-R"],[6.0,6.1,7.2,"DK-EW-y6-W"],[6.0,9.8,10.9,"DK-EW-y6-E"],[2.0,6.1,7.2,"DK-EW-y2-W"],[2.0,9.8,10.9,"DK-EW-y2-E"]],"ns":[[7.2,2.0,10.0],[9.8,2.0,10.0]],"nsDrop":0.16,"rafters":[[3.0,6.1,7.2],[3.0,9.8,10.9],[4.0,6.1,7.2],[4.0,9.8,10.9],[5.0,6.1,7.2],[5.0,9.8,10.9],[7.0,6.1,7.2],[7.0,9.8,10.9],[9.0,6.1,7.2],[9.0,9.8,10.9]],"sheets":[["R2-deck-W",6.1,7.2,2.0,10.0],["R2-deck-E",9.8,10.9,2.0,10.0],["R2-deck-N1",7.2,8.5,8.0,10.0],["R2-deck-N2",8.5,9.8,8.0,10.0]],"coverDesc":"SCG translucent sheet \"Heat Shield\" (R2), 3 deg"}},"units":{"D1":{"kind":"door","w":5.8,"h":2.35,"leaves":10,"leaf":"glass","group":"บานเฟี้ยม","desc":"Bi-fold, 10 leaves"},"D2":{"kind":"door","w":3.8,"h":2.35,"leaves":8,"leaf":"glass","group":"บานเฟี้ยม","desc":"Bi-fold, 8 leaves (upper fixed timber louvre, lower glass)"},"D3":{"kind":"door","w":2.6,"h":2.35,"leaves":5,"leaf":"glass","group":"บานเฟี้ยม","desc":"Bi-fold, 5 leaves"},"D4":{"kind":"door","w":1.1,"h":2.35,"leaves":1,"leaf":"wood","group":"บานเปิด","desc":"Swing, single"},"D5":{"kind":"door","w":0.75,"h":2.05,"leaves":1,"leaf":"wood","group":"บานเปิด","desc":"Swing, single (bath)"},"AW1":{"kind":"window","w":0.7,"h":1.55,"sill":0.8,"leaves":1,"group":"หน้าต่าง","desc":"Casement, single"},"AW2":{"kind":"window","w":1.35,"h":0.55,"sill":1.0,"leaves":2,"group":"หน้าต่าง","desc":"Awning, pair"},"AW3":{"kind":"window","w":1.15,"h":0.55,"sill":1.8,"leaves":2,"group":"หน้าต่าง","desc":"Awning, pair"},"AW4":{"kind":"window","w":2.6,"h":1.55,"sill":0.8,"leaves":3,"group":"หน้าต่าง","desc":"Casement, 3 leaves"}},"wallBase":0.55,"wallT":0.1,"ridgeCaps":true,"mep":{"fixtures":[{"name":"WC-BATH1","ifc":"IfcFlowTerminal","mark":"TOL","box":[0.56,0.94,11.3,11.95,0.65,1.05],"mat":"sanitary","desc":"Close-coupled WC (AMERICAN STANDARD / COTTO / KARAT)"},{"name":"COUNTER-BATH1","ifc":"IfcSlab","mark":"COUNTER","box":[1.025,1.775,11.35,11.95,1.35,1.4500000000000002],"mat":"concrete","desc":"RC counter 0.60 deep, granite/tile top (A-12)"},{"name":"LAV-BATH1","ifc":"IfcFlowTerminal","mark":"LAV","box":[1.15,1.65,11.5,11.9,1.4500000000000002,1.6],"mat":"sanitary","desc":"Counter-top basin"},{"name":"SHOWER-BATH1","ifc":"IfcFlowTerminal","mark":"SW","box":[0.2,0.3,11.85,11.95,1.75,2.65],"mat":"steel","desc":"Shower set + heater (A-12)"},{"name":"WC-BATH2","ifc":"IfcFlowTerminal","mark":"TOL","box":[14.06,14.44,11.3,11.95,0.65,1.05],"mat":"sanitary","desc":"Close-coupled WC (AMERICAN STANDARD / COTTO / KARAT)"},{"name":"COUNTER-BATH2","ifc":"IfcSlab","mark":"COUNTER","box":[13.175,13.925,11.35,11.95,1.35,1.4500000000000002],"mat":"concrete","desc":"RC counter 0.60 deep, granite/tile top (A-12)"},{"name":"LAV-BATH2","ifc":"IfcFlowTerminal","mark":"LAV","box":[13.3,13.8,11.5,11.9,1.4500000000000002,1.6],"mat":"sanitary","desc":"Counter-top basin"},{"name":"SHOWER-BATH2","ifc":"IfcFlowTerminal","mark":"SW","box":[14.649999999999999,14.75,11.85,11.95,1.75,2.65],"mat":"steel","desc":"Shower set + heater (A-12)"}],"electrical":[{"name":"DL-MP-01","ifc":"IfcFlowTerminal","mark":"DL","box":[0.99,1.11,2.84,2.96,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-02","ifc":"IfcFlowTerminal","mark":"DL","box":[0.99,1.11,4.840000000000001,4.96,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-03","ifc":"IfcFlowTerminal","mark":"DL","box":[0.99,1.11,6.840000000000001,6.96,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-04","ifc":"IfcFlowTerminal","mark":"DL","box":[0.99,1.11,8.99,9.110000000000001,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-05","ifc":"IfcFlowTerminal","mark":"DL","box":[2.9899999999999998,3.11,2.84,2.96,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-06","ifc":"IfcFlowTerminal","mark":"DL","box":[2.9899999999999998,3.11,4.840000000000001,4.96,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-07","ifc":"IfcFlowTerminal","mark":"DL","box":[2.9899999999999998,3.11,6.840000000000001,6.96,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-08","ifc":"IfcFlowTerminal","mark":"DL","box":[2.9899999999999998,3.11,8.99,9.110000000000001,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-09","ifc":"IfcFlowTerminal","mark":"DL","box":[4.99,5.109999999999999,2.84,2.96,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-10","ifc":"IfcFlowTerminal","mark":"DL","box":[4.99,5.109999999999999,4.840000000000001,4.96,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-11","ifc":"IfcFlowTerminal","mark":"DL","box":[4.99,5.109999999999999,6.840000000000001,6.96,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-MP-12","ifc":"IfcFlowTerminal","mark":"DL","box":[4.99,5.109999999999999,8.99,9.110000000000001,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-LAUNDRY-1","ifc":"IfcFlowTerminal","mark":"DL","box":[2.84,2.96,10.94,11.06,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-LAUNDRY-2","ifc":"IfcFlowTerminal","mark":"DL","box":[4.04,4.159999999999999,10.94,11.06,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-LAUNDRY-3","ifc":"IfcFlowTerminal","mark":"DL","box":[5.24,5.359999999999999,10.94,11.06,3.56,3.6],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BATH1-1","ifc":"IfcFlowTerminal","mark":"DL","box":[0.74,0.8600000000000001,10.94,11.06,3.21,3.25],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BATH1-2","ifc":"IfcFlowTerminal","mark":"DL","box":[1.54,1.6600000000000001,10.94,11.06,3.21,3.25],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BATH2-1","ifc":"IfcFlowTerminal","mark":"DL","box":[13.34,13.46,10.94,11.06,3.21,3.25],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BATH2-2","ifc":"IfcFlowTerminal","mark":"DL","box":[14.139999999999999,14.26,10.94,11.06,3.21,3.25],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-ALCOVE","ifc":"IfcFlowTerminal","mark":"DL","box":[11.84,11.96,10.94,11.06,3.46,3.5],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BED1-1","ifc":"IfcFlowTerminal","mark":"DL","box":[11.94,12.06,8.99,9.110000000000001,3.46,3.5],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BED1-2","ifc":"IfcFlowTerminal","mark":"DL","box":[13.94,14.06,8.99,9.110000000000001,3.46,3.5],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BED1-3","ifc":"IfcFlowTerminal","mark":"DL","box":[11.94,12.06,6.94,7.06,3.46,3.5],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BED1-4","ifc":"IfcFlowTerminal","mark":"DL","box":[13.94,14.06,6.94,7.06,3.46,3.5],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BED2-1","ifc":"IfcFlowTerminal","mark":"DL","box":[11.94,12.06,4.890000000000001,5.01,3.46,3.5],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BED2-2","ifc":"IfcFlowTerminal","mark":"DL","box":[13.94,14.06,4.890000000000001,5.01,3.46,3.5],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BED2-3","ifc":"IfcFlowTerminal","mark":"DL","box":[11.94,12.06,2.89,3.0100000000000002,3.46,3.5],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"DL-BED2-4","ifc":"IfcFlowTerminal","mark":"DL","box":[13.94,14.06,2.89,3.0100000000000002,3.46,3.5],"mat":"light","desc":"LED downlight dia 100 mm, E27 7-12 W (EE-01)"},{"name":"LOAD-CENTER","ifc":"IfcElectricDistributionPoint","mark":"LC","box":[4.9,5.3,9.83,9.95,2.3,2.7],"mat":"panel","desc":"Load centre 12-way, main 2x... (EE-01), 1.80 m to top"}],"chambers":[{"name":"MH-01","ifc":"IfcDistributionChamberElement","mark":"MH","box":[-1.43,-0.97,12.74,13.200000000000001,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-02","ifc":"IfcDistributionChamberElement","mark":"MH","box":[-1.43,-0.97,8.709999999999999,9.17,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-03","ifc":"IfcDistributionChamberElement","mark":"MH","box":[-1.43,-0.97,4.67,5.130000000000001,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-04","ifc":"IfcDistributionChamberElement","mark":"MH","box":[-1.43,-0.97,0.67,1.1300000000000001,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-05","ifc":"IfcDistributionChamberElement","mark":"MH","box":[2.91,3.37,0.67,1.1300000000000001,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-06","ifc":"IfcDistributionChamberElement","mark":"MH","box":[7.77,8.23,7.47,7.930000000000001,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-07","ifc":"IfcDistributionChamberElement","mark":"MH","box":[7.77,8.23,4.67,5.130000000000001,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-08","ifc":"IfcDistributionChamberElement","mark":"MH","box":[7.77,8.23,0.67,1.1300000000000001,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-09","ifc":"IfcDistributionChamberElement","mark":"MH","box":[11.77,12.23,0.67,1.1300000000000001,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-10","ifc":"IfcDistributionChamberElement","mark":"MH","box":[16.15,16.61,13.87,14.33,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-11","ifc":"IfcDistributionChamberElement","mark":"MH","box":[16.15,16.61,9.83,10.290000000000001,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-12","ifc":"IfcDistributionChamberElement","mark":"MH","box":[16.15,16.61,5.27,5.73,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-13","ifc":"IfcDistributionChamberElement","mark":"MH","box":[16.15,16.61,0.67,1.1300000000000001,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"MH-14","ifc":"IfcDistributionChamberElement","mark":"MH","box":[16.15,16.61,-6.130000000000001,-5.67,-0.75,0.0],"mat":"concrete_dark","desc":"RC inspection chamber 0.46x0.46 (SN-02)"},{"name":"GREASE-TRAP","ifc":"IfcDistributionChamberElement","mark":"GT","box":[16.029999999999998,16.73,-2.55,-1.35,-0.8,0.0],"mat":"concrete_dark","desc":"Grease/garbage trap (SN-02), size ASSUMED"}],"pipes":[{"name":"DR-west","p1":[-1.2,12.97,-0.3],"p2":[-1.2,0.9,-0.36035],"dia":0.2},{"name":"DR-south","p1":[-1.2,0.9,-0.36035],"p2":[16.38,0.9,-0.44825],"dia":0.2},{"name":"DR-mid","p1":[8.0,7.7,-0.4],"p2":[8.0,0.9,-0.43400000000000005],"dia":0.2},{"name":"DR-east-up","p1":[16.38,14.1,-0.38225],"p2":[16.38,0.9,-0.44825],"dia":0.2},{"name":"DR-east-out","p1":[16.38,0.9,-0.44825],"p2":[16.38,-5.9,-0.48224999999999996],"dia":0.2},{"name":"DR-septic","p1":[14.6,14.1,-0.36224999999999996],"p2":[16.38,14.1,-0.38225],"dia":0.1}],"tank":{"name":"SEPTIC-TANK","x":13.98,"y":14.1,"r":0.55,"z0":-1.8,"h":1.9,"sides":12,"desc":"Prefab septic/aeration tank (SN-03), dia 1.10 m ASSUMED, on 1.20x1.20 RC base"}},"site":{"x0":-3.0,"x1":19.0,"y0":-7.0,"y1":16.0},"takeoffDesc":{"pile":["เสาเข็มคอนกรีตอัดแรง I-18×18 ซม. ยาว 8.00 ม.","ต้น","20 ต้น จาก S-04 (1 ต้น/ฐานราก); ความยาว 8.00 ม. เป็นค่าสมมติ"],"exc":["ขุดดินฐานราก (เผื่อทำงานรอบฐาน 0.30 ม.)","ลบ.ม.","20 × 1.30×1.30 × ลึก 1.15 ม. (หลังฐาน −1.00 + ทราย/คอนกรีตหยาบ 0.15)"],"sand":["ทรายหยาบรองก้นหลุม อัดแน่น หนา 0.10 ม.","ลบ.ม.","S-09: 0.90×0.90×0.10 ต่อฐาน"],"lean":["คอนกรีตหยาบ หนา 0.05 ม.","ลบ.ม.","S-09: 0.90×0.90×0.05 ต่อฐาน"],"bf":["ถมดินกลับรอบฐานราก บดอัด","ลบ.ม.","ขุด − ฐานราก − ตอม่อใต้ดิน − ทราย − คอนกรีตหยาบ"],"cutpile":["ตัดหัวเข็ม/ปรับระดับหัวเข็ม","ต้น","ต่อเสาเข็ม"],"c_ft":["คอนกรีตฐานราก F1","ลบ.ม.","20 × 0.70×0.70×0.70 (S-09)"],"f_ft":["แบบหล่อฐานราก F1","ตร.ม.","ข้าง 4 ด้าน × 0.70×0.70"],"db_ft":["เหล็ก DB16 ฐานราก (10-DB16 ตะแกรงล่าง งอปลาย 0.25)","กก.","10 เส้น × 1.12 ม. × 1.578 กก./ม. ต่อฐาน"],"rb_ft":["เหล็ก RB9 ฐานราก (2-RB9 รัดรอบ)","กก.","2 รอบ × 2.48 ม."],"c_cl":["คอนกรีตตอม่อ/เสาล่าง C1 0.30×0.30","ลบ.ม.","ยอดฐานราก −0.30 ถึงยอดคาน +0.55"],"f_cl":["แบบหล่อตอม่อ","ตร.ม.","เส้นรอบรูป 1.20 × สูง 0.85"],"db_cl":["เหล็ก DB12 ตอม่อ (4-DB12 + ฝังฐาน 0.30 + ต่อทาบ 0.60)","กก.","4 เส้น × (0.85+0.90)"],"rb_cl":["เหล็กปลอก RB9@0.15 ตอม่อ","กก.","ปลอกยาว 0.98 ม./วง"],"c_cu":["คอนกรีตเสา C1 0.20×0.20 (พื้นถึงหลังคา)","ลบ.ม.","20 ต้น ความสูงตามโมเดล (2.8–4.6 ม.)"],"f_cu":["แบบหล่อเสา C1","ตร.ม.","เส้นรอบรูป 0.80 × สูง"],"db_cu":["เหล็ก DB12 เสา C1 (4-DB12 + ต่อทาบ 0.50)","กก.","4 เส้น × (สูง+0.50)"],"rb_cu":["เหล็กปลอก RB9@0.15 เสา C1","กก.","ปลอกยาว 0.58 ม./วง"],"c_bm":["คอนกรีตคาน B1–B4 (รวม B1C/B2C/B3C/B4C)","ลบ.ม.","ช่วงสุทธิระหว่างผิวเสา จากโมเดล B1 26.7 ม., B1C 1.2 ม., B2 45.0 ม., B3 30.9 ม., B3C 3.5 ม., B4 17.1 ม., B4C 2.3 ม."],"f_bm":["แบบหล่อคาน (ท้อง + ข้าง 2 ด้าน)","ตร.ม.","(b + 2d) × L"],"db_bm12":["เหล็ก DB12 คาน","กก.","จำนวนเส้นเทียบเท่าต่อหน้าตัดจากตาราง S-08 (A/B/C เฉลี่ย) × L × 1.10 (ระยะฝัง/ต่อทาบ)"],"db_bm16":["เหล็ก DB16 คาน","กก.","เหมือนข้างบน: B2 5.1, B2C 5, B3 7, B3C 6, B4/B4C 10 เส้นเทียบเท่า"],"rb_bm":["เหล็กปลอก RB9@0.15 คาน","กก.","ปลอก 2(b+d)−0.24+0.20 ม. ต่อวง"],"ps":["แผ่นพื้นสำเร็จรูปอัดแรง หนา 0.10 ม. รับ LL 150 กก./ตร.ม.","ตร.ม.","พื้นที่ห้อง (อเนกประสงค์ ห้องนอน ซักรีด มุมแต่งตัว) จากโมเดล"],"c_top":["คอนกรีตเททับหน้า (topping) หนา 0.05 ม.","ลบ.ม.","พื้นที่ PS × 0.05"],"rb_top":["เหล็กเสริมกันร้าว RB6@0.20 ในคอนกรีตทับหน้า","กก.","2 ทิศ × 5 เส้น/ม. × 0.222 (S-02)"],"c_s1":["คอนกรีตพื้น S1 (ห้องน้ำ เฉลียง ระเบียง) หนา 0.10 ม.","ลบ.ม.","ความหนา 0.10 ม. เป็นค่าสมมติ"],"f_s1":["แบบหล่อท้องพื้น S1","ตร.ม.","พื้นที่ท้องพื้น"],"rb_s1":["เหล็ก RB9@0.15 พื้น S1 (ล่าง 2 ทิศ + บนที่ขอบ)","กก.","≈ 9.3 กก./ตร.ม. (S-09)"],"c_st":["คอนกรีตบันได ST-1 (ด้านหน้า 7.20 ม. + ด้านหลัง 3.70 ม.)","ลบ.ม.","จากโมเดล 3 ขั้น @0.15/0.30"],"f_st":["แบบหล่อบันได (ท้อง + ลูกตั้ง)","ตร.ม.","ท้องบันได 1.08×10.9 + ลูกตั้ง 3×0.15×10.9 + ข้าง"],"rb_st":["เหล็ก RB9 บันได","กก.","≈ 80 กก./ลบ.ม. (S-09 RB9@0.15/0.20)"],"st_150":["เหล็กกล่อง 150×50×2.3 มม. (ดั้ง อกไก่ อะเส โครงหลัก)","กก.","ยาว 146.5 ม. × 7.06 กก./ม. (S-07)"],"st_100":["เหล็กกล่อง 100×50×3.2 มม. จันทัน @1.00","กก.","ยาว 154.5 ม. × 7.21 กก./ม."],"st_50":["เหล็กกล่อง 50×50×2.3 มม. แป @1.00","กก.","ยาว 222.0 ม. × 3.45 กก./ม."],"st_i":["เหล็ก I-150×75×5.5×9.5 มม. หลังคาเฉลียง","กก.","ยาว 30.0 ม. × 14.0 กก./ม. (S-06)"],"st_conn":["แผ่นเหล็กฐาน พุก สลักเกลียว A325 ข้อต่อ","กก.","5% ของน้ำหนักเหล็กโครงหลังคา (สมมติ)"],"st_paint":["ทาสีกันสนิม 2 ชั้น + สีน้ำมัน 2 ชั้น โครงเหล็ก","กก.","คิดตามน้ำหนักเหล็ก"],"w_aac":["ก่อผนังอิฐมวลเบา Q-CON Extra Cool หนา 7.5 ซม. (P1, P2)","ตร.ม.","พื้นที่สุทธิหักช่องเปิด จากโมเดล: P1 131.2 + P2 26.1"],"w_brick":["ก่อผนังอิฐมอญครึ่งแผ่น ห้องน้ำ (P3)","ตร.ม.","ผนังกั้นห้องน้ำ 2 ด้าน จากโมเดล"],"w_tie":["เสาเอ็น-ทับหลัง ค.ส.ล. (ทุก 3.00 ม. และรอบวงกบ)","ตร.ม.","คิดตามพื้นที่ผนัง (A-01 หมายเหตุผนังทั่วไป)"],"plaster":["ฉาบปูนเรียบ 2 ด้าน","ตร.ม.","2 × พื้นที่ผนัง"],"t_wall":["กรุกระเบื้องผนังห้องน้ำ (สูงถึงฝ้า +2.60)","ตร.ม.","ห้องน้ำ 2 ห้อง 2.05×1.80 ม. หักประตู D5 และหน้าต่าง AW3 (A-13)"],"breeze":["ผนังบล็อกช่องลม 19×19×9 ซม. (AW5, AW6)","ตร.ม.","จากโมเดล (AW5 2 ช่วง + AW6)"],"louvre":["ระแนงไม้เนื้อแข็งแนวตั้ง 25×80 มม. @100 ด้านหลังส่วนซักรีด","ตร.ม.","x 2.30–3.30, สูง 3.00 ม. (A-07)"],"f2":["พื้นกระเบื้องแกรนิตโต้ 24\"×24\" (F2)","ตร.ม.","ห้องอเนกประสงค์ ห้องนอน 1–2 มุมแต่งตัว"],"f3":["พื้นกระเบื้องเคลือบกันลื่น 8\"×8\" (F3) + ปรับระดับ","ตร.ม.","ห้องน้ำ 2 ห้อง"],"wp":["กันซึมพื้นห้องน้ำ (ทาทับขึ้นผนัง 0.30 ม.)","ตร.ม.","พื้น + ขอบผนัง"],"f4":["พื้นไม้เนื้อเทียม (F4) บนพื้น ค.ส.ล. — เฉลียง ระเบียง ซักรีด","ตร.ม.","จากโมเดล 9 ส่วน"],"skirt":["บัวเชิงผนังกระเบื้อง/ไม้เทียม","ม.","เส้นรอบห้องหักช่องประตู"],"c1":["ฝ้าสมาร์ทบอร์ด 4 มม. โครงเคร่าชุบสังกะสี ฉนวน Stay Cool 75 มม. (C1)","ตร.ม.","จากโมเดล"],"c2":["ฝ้าสมาร์ทบอร์ดชนิดกันชื้น + ฉนวน (C2) ห้องน้ำ","ตร.ม.","จากโมเดล"],"r1":["หลังคาไฟเบอร์ซีเมนต์ลอนคู่ไฮบริด (R1) พร้อมอุปกรณ์ยึด","ตร.ม.","พื้นที่ตามลาด 20° จากโมเดล (รวมชายคา 1.00 ม.)"],"ridge":["ครอบสันหลังคา","ม.","สัน R1 14.0 ม. + R2 12.0 ม."],"fascia":["เชิงชาย-ปั้นลมไฟเบอร์ซีเมนต์ 8\"","ม.","รอบหลังคา R1 + R2 (สมมติ — ไม่มีรายละเอียดในแบบ)"],"r2":["หลังคาแผ่นโปร่งแสงฮีทชิลด์ (R2) เฉลียง 3°","ตร.ม.","จากโมเดล"],"flash":["แผ่นปิดรอยต่อ (flashing) หลังคาเฉลียงชนผนัง/เสา","ม.","แนวแกน 2, 3 และหัว U (สมมติ)"],"paint_ext":["ทาสีภายนอก (รองพื้นกันด่าง + สีจริง 2 ชั้น)","ตร.ม.","ผนัง P1 ด้านนอก"],"paint_int":["ทาสีภายใน (รองพื้น + สีจริง 2 ชั้น)","ตร.ม.","P1 ด้านใน + P2/P3 สองด้าน − ผนังกรุกระเบื้อง"],"paint_ceil":["ทาสีฝ้าเพดาน","ตร.ม.","C1 + C2"],"paint_bz":["ทาสีผนังบล็อกช่องลม 2 ด้าน (เผื่อผิวช่องลม ×2.5)","ตร.ม.","พื้นที่ × 2 ด้าน × 2.5"],"counter":["เคาน์เตอร์ ค.ส.ล. ห้องน้ำ ปิดผิวหินแกรนิต 0.75×0.60 ม.","ชุด","A-12, A-13"],"acc":["อุปกรณ์ห้องน้ำ (กระจกเงา ที่ใส่สบู่ ที่ใส่กระดาษ ราวแขวนผ้า)","ชุด","A-13 ตารางสุขภัณฑ์"],"wc":["โถส้วมชักโครก (AMERICAN STANDARD/COTTO/KARAT)","ชุด","A-13"],"lav":["อ่างล้างหน้าวางบนเคาน์เตอร์ + ก๊อก + ท่อน้ำทิ้ง","ชุด","A-13"],"shower":["ชุดฝักบัว + เครื่องทำน้ำอุ่น 3,500 W","ชุด","A-12 การเดินท่อน้ำอุ่น"],"spray":["สายฉีดชำระ + วาล์ว","ชุด","A-13"],"fd":["ตะแกรงระบายน้ำพื้น (FD) กันกลิ่น 2\"","จุด","ห้องน้ำ 2 + ซักรีด 1"],"wm":["จุดน้ำดีเครื่องซักผ้า + ก๊อกล้างพื้น","จุด","ซักรีด 1 + ห้องน้ำ 2 (ก๊อกล้างพื้น 0.40)"],"cw_in":["ท่อน้ำดี PPR/PVC ½\"–¾\" ภายในอาคาร พร้อมข้อต่อ วาล์ว","ม.","ประมาณจากผัง (ไม่มีแบบท่อน้ำดีละเอียด)"],"cw_main":["ท่อน้ำดีเมน PVC 1\" จากมาตรวัดถึงอาคาร","ม.","สมมติระยะจากแนวถนน 20 ม."],"meter":["ประตูน้ำ/ชุดมาตรวัดน้ำ (ไม่รวมค่าธรรมเนียมการประปา)","ชุด","สมมติ"],"p4":["ท่อโสโครก PVC 4\" (ส้วม → ถังบำบัด) พร้อมข้อต่อ ท่อระบายอากาศ 2\"","ม.","ประมาณจาก SN-01"],"p2":["ท่อน้ำทิ้ง PVC 2\" (อ่าง FD ซักรีด → บ่อพัก)","ม.","ประมาณจาก SN-01"],"p8":["ท่อระบายน้ำรอบอาคาร Ø8\" ลาด 1:200 (SN-01)","ม.","จากโมเดล 5 ช่วง"],"p_exc":["ขุด-ถมกลับร่องท่อระบายน้ำ","ลบ.ม.","กว้าง 0.50 × ลึกเฉลี่ย 0.60"],"mh":["บ่อพัก ค.ส.ล. 0.46×0.46 ม. พร้อมฝา (SN-02)","บ่อ","จากโมเดล"],"gt":["บ่อดักขยะ-ไขมัน (SN-02)","บ่อ","SN-01/SN-02"],"sat":["ถังบำบัดน้ำเสียสำเร็จรูป (SN-03) พร้อมฐาน ค.ส.ล. 1.20×1.20 เสาเข็ม","ชุด","ขนาดถังสมมติ 1,000–1,600 ลิตร (บ้าน 2 ห้องนอน)"],"e_meter":["ระบบไฟฟ้าเข้าอาคาร: สายเมน THW 16 ตร.มม. + ท่อ + ค่าขอมิเตอร์ 15(45)A","ชุด","ค่าธรรมเนียม กฟภ. เป็นค่าสมมติ"],"e_lc":["ตู้ Load Center 12 ช่อง + เมนเบรกเกอร์ + ลูกย่อย (EE-01)","ชุด","EE-01 ผังวงจรตู้ 12 ช่อง"],"e_gnd":["หลักดิน + สายดินทองแดงเปลือย 10 ตร.มม.","ชุด","EE-01"],"e_lpt":["จุดโคมไฟ (เดินสาย IEC01 2.5 ตร.มม. ในท่อ uPVC + กล่อง)","จุด","นับจาก EE-02: ดาวน์ไลท์ 28 + โคมติดผนัง 8"],"e_sw":["จุดสวิตช์ (ทางเดียว 11 + สองทาง 2)","จุด","นับจาก EE-02"],"e_so":["จุดเต้ารับคู่มีกราวด์ 16A (สูง 0.30/1.20)","จุด","นับจาก EE-03"],"e_wp":["จุดเต้ารับกันน้ำ WP","จุด","นับจาก EE-03 (ซักรีด 1 + เฉลียง 2)"],"e_ac":["วงจรเครื่องปรับอากาศ (สาย 4 ตร.มม. + J-box)","จุด","EE-03 ห้องนอน 1–2"],"e_wh":["วงจรเครื่องทำน้ำอุ่น (สาย 4 ตร.มม. + J-box + RCBO)","จุด","EE-03 ห้องน้ำ 1–2"],"e_com":["จุดเต้ารับ TV / LAN / โทรศัพท์ (ท่อ + กล่อง + หน้ากาก)","จุด","นับจาก EE-03: อย่างละ 3"],"e_dl":["โคมดาวน์ไลท์ LED Ø100 มม. E27 7–12 W (EE-01)","ชุด","EE-02"],"e_wl":["โคมติดผนัง GU10 (EE-01)","ชุด","EE-02 เฉลียง/ระเบียง"],"e_test":["ทดสอบระบบไฟฟ้า ค่าความเป็นฉนวน ความต้านทานดิน","งาน",""]},"manualQty":{"fd":{"desc":"ตะแกรงระบายน้ำพื้น (FD) กันกลิ่น 2\"","unit":"จุด","qty":3,"basis":"ห้องน้ำ 2 + ซักรีด 1"},"wm":{"desc":"จุดน้ำดีเครื่องซักผ้า + ก๊อกล้างพื้น","unit":"จุด","qty":3,"basis":"ซักรีด 1 + ห้องน้ำ 2 (ก๊อกล้างพื้น 0.40)"},"cw_in":{"desc":"ท่อน้ำดี PPR/PVC ½\"–¾\" ภายในอาคาร พร้อมข้อต่อ วาล์ว","unit":"ม.","qty":45.0,"basis":"ประมาณจากผัง (ไม่มีแบบท่อน้ำดีละเอียด)"},"cw_main":{"desc":"ท่อน้ำดีเมน PVC 1\" จากมาตรวัดถึงอาคาร","unit":"ม.","qty":20.0,"basis":"สมมติระยะจากแนวถนน 20 ม."},"meter":{"desc":"ประตูน้ำ/ชุดมาตรวัดน้ำ (ไม่รวมค่าธรรมเนียมการประปา)","unit":"ชุด","qty":1,"basis":"สมมติ"},"p4":{"desc":"ท่อโสโครก PVC 4\" (ส้วม → ถังบำบัด) พร้อมข้อต่อ ท่อระบายอากาศ 2\"","unit":"ม.","qty":18.0,"basis":"ประมาณจาก SN-01"},"p2":{"desc":"ท่อน้ำทิ้ง PVC 2\" (อ่าง FD ซักรีด → บ่อพัก)","unit":"ม.","qty":24.0,"basis":"ประมาณจาก SN-01"},"gt":{"desc":"บ่อดักขยะ-ไขมัน (SN-02)","unit":"บ่อ","qty":1,"basis":"SN-01/SN-02"},"sat":{"desc":"ถังบำบัดน้ำเสียสำเร็จรูป (SN-03) พร้อมฐาน ค.ส.ล. 1.20×1.20 เสาเข็ม","unit":"ชุด","qty":1,"basis":"ขนาดถังสมมติ 1,000–1,600 ลิตร (บ้าน 2 ห้องนอน)"},"wc":{"desc":"โถส้วมชักโครก (AMERICAN STANDARD/COTTO/KARAT)","unit":"ชุด","qty":2,"basis":"A-13"},"lav":{"desc":"อ่างล้างหน้าวางบนเคาน์เตอร์ + ก๊อก + ท่อน้ำทิ้ง","unit":"ชุด","qty":2,"basis":"A-13"},"shower":{"desc":"ชุดฝักบัว + เครื่องทำน้ำอุ่น 3,500 W","unit":"ชุด","qty":2,"basis":"A-12 การเดินท่อน้ำอุ่น"},"spray":{"desc":"สายฉีดชำระ + วาล์ว","unit":"ชุด","qty":2,"basis":"A-13"},"counter":{"desc":"เคาน์เตอร์ ค.ส.ล. ห้องน้ำ ปิดผิวหินแกรนิต 0.75×0.60 ม.","unit":"ชุด","qty":2,"basis":"A-12, A-13"},"acc":{"desc":"อุปกรณ์ห้องน้ำ (กระจกเงา ที่ใส่สบู่ ที่ใส่กระดาษ ราวแขวนผ้า)","unit":"ชุด","qty":2,"basis":"A-13 ตารางสุขภัณฑ์"},"e_meter":{"desc":"ระบบไฟฟ้าเข้าอาคาร: สายเมน THW 16 ตร.มม. + ท่อ + ค่าขอมิเตอร์ 15(45)A","unit":"ชุด","qty":1,"basis":"ค่าธรรมเนียม กฟภ. เป็นค่าสมมติ"},"e_lc":{"desc":"ตู้ Load Center 12 ช่อง + เมนเบรกเกอร์ + ลูกย่อย (EE-01)","unit":"ชุด","qty":1,"basis":"EE-01 ผังวงจรตู้ 12 ช่อง"},"e_gnd":{"desc":"หลักดิน + สายดินทองแดงเปลือย 10 ตร.มม.","unit":"ชุด","qty":1,"basis":"EE-01"},"e_lpt":{"desc":"จุดโคมไฟ (เดินสาย IEC01 2.5 ตร.มม. ในท่อ uPVC + กล่อง)","unit":"จุด","qty":36,"basis":"นับจาก EE-02: ดาวน์ไลท์ 28 + โคมติดผนัง 8"},"e_sw":{"desc":"จุดสวิตช์ (ทางเดียว 11 + สองทาง 2)","unit":"จุด","qty":13,"basis":"นับจาก EE-02"},"e_so":{"desc":"จุดเต้ารับคู่มีกราวด์ 16A (สูง 0.30/1.20)","unit":"จุด","qty":17,"basis":"นับจาก EE-03"},"e_wp":{"desc":"จุดเต้ารับกันน้ำ WP","unit":"จุด","qty":3,"basis":"นับจาก EE-03 (ซักรีด 1 + เฉลียง 2)"},"e_ac":{"desc":"วงจรเครื่องปรับอากาศ (สาย 4 ตร.มม. + J-box)","unit":"จุด","qty":2,"basis":"EE-03 ห้องนอน 1–2"},"e_wh":{"desc":"วงจรเครื่องทำน้ำอุ่น (สาย 4 ตร.มม. + J-box + RCBO)","unit":"จุด","qty":2,"basis":"EE-03 ห้องน้ำ 1–2"},"e_com":{"desc":"จุดเต้ารับ TV / LAN / โทรศัพท์ (ท่อ + กล่อง + หน้ากาก)","unit":"จุด","qty":9,"basis":"นับจาก EE-03: อย่างละ 3"},"e_dl":{"desc":"โคมดาวน์ไลท์ LED Ø100 มม. E27 7–12 W (EE-01)","unit":"ชุด","qty":28,"basis":"EE-02"},"e_wl":{"desc":"โคมติดผนัง GU10 (EE-01)","unit":"ชุด","qty":8,"basis":"EE-02 เฉลียง/ระเบียง"},"e_test":{"desc":"ทดสอบระบบไฟฟ้า ค่าความเป็นฉนวน ความต้านทานดิน","unit":"งาน","qty":1,"basis":""},"louvre":{"desc":"ระแนงไม้เนื้อแข็งแนวตั้ง 25×80 มม. @100 ด้านหลังส่วนซักรีด","unit":"ตร.ม.","qty":3.0,"basis":"x 2.30–3.30, สูง 3.00 ม. (A-07)"},"ridge":{"desc":"ครอบสันหลังคา","unit":"ม.","qty":26.0,"basis":"สัน R1 14.0 ม. + R2 12.0 ม."},"fascia":{"desc":"เชิงชาย-ปั้นลมไฟเบอร์ซีเมนต์ 8\"","unit":"ม.","qty":80,"basis":"รอบหลังคา R1 + R2 (สมมติ — ไม่มีรายละเอียดในแบบ)"},"flash":{"desc":"แผ่นปิดรอยต่อ (flashing) หลังคาเฉลียงชนผนัง/เสา","unit":"ม.","qty":18.6,"basis":"แนวแกน 2, 3 และหัว U (สมมติ)"},"skirt":{"desc":"บัวเชิงผนังกระเบื้อง/ไม้เทียม","unit":"ม.","qty":52.4,"basis":"เส้นรอบห้องหักช่องประตู"}},"rates":{"slabS1_kgm2":9.3,"stair_kgm3":80,"lapFactor":1.1,"steelConn":0.05,"topMeshKgm2":2.22,"kgm":{"PRIMARY":7.06,"RIDGE":7.06,"EAVE":7.06,"RAFTER":7.21,"DECK-RAFTER":7.21,"PURLIN":3.45,"DECK-I":14.0,"DECK-I-NS":14.0},"bathTile":{"rooms":2,"w":2.05,"d":1.8,"h":2.6,"minus":2.17},"breezePaintFactor":2.5,"drainTrench":[0.5,0.6],"stairFormwork":18.677},"boq":[{"code":"S","title":"หมวดที่ 1 งานโครงสร้าง","subs":[{"title":"1.1 งานเตรียมการและงานชั่วคราว","items":[{"key":"clear","desc":"ถางปรับพื้นที่ก่อสร้าง ปรับระดับ บดอัดใต้อาคาร","unit":"ตร.ม.","note":"พื้นที่รอบอาคาร 20×17 ม. (สมมติ)","qty":340,"mat":0,"lab":20,"waste":0,"act":"A01"},{"key":"setout","desc":"สำรวจ วางผัง ตั้งหมุดแนวเสา ตรวจระดับ","unit":"งาน","note":"","qty":1,"mat":0,"lab":8000,"waste":0,"act":"A01"},{"key":"temp","desc":"งานชั่วคราว: โรงเก็บวัสดุ ที่พักคนงาน ไฟ-น้ำชั่วคราว รั้วกันเขต ป้าย","unit":"งาน","note":"สมมติ","qty":1,"mat":20000,"lab":10000,"waste":0,"act":"A01"}]},{"title":"1.2 งานเสาเข็มและงานดิน","items":[{"key":"pile","mat":1600,"lab":500,"waste":0,"act":"A02"},{"key":"cutpile","mat":0,"lab":100,"waste":0,"act":"A03"},{"key":"exc","mat":0,"lab":120,"waste":0,"act":"A03"},{"key":"sand","mat":500,"lab":100,"waste":5,"act":"A03"},{"key":"lean","mat":2150,"lab":300,"waste":5,"act":"A03"},{"key":"bf","mat":0,"lab":90,"waste":0,"act":"A05"}]},{"title":"1.3 งานฐานรากและตอม่อ","items":[{"key":"c_ft","mat":2350,"lab":300,"waste":3,"act":"A04"},{"key":"f_ft","mat":160,"lab":200,"waste":0,"act":"A04"},{"key":"db_ft","mat":25,"lab":5,"waste":5,"act":"A04"},{"key":"rb_ft","mat":26,"lab":5,"waste":5,"act":"A04"},{"key":"c_cl","mat":2350,"lab":300,"waste":3,"act":"A04"},{"key":"f_cl","mat":160,"lab":200,"waste":0,"act":"A04"},{"key":"db_cl","mat":25,"lab":5,"waste":5,"act":"A04"},{"key":"rb_cl","mat":26,"lab":5,"waste":5,"act":"A04"}]},{"title":"1.4 งานคานและพื้น","items":[{"key":"f_bm","mat":160,"lab":200,"waste":0,"act":"A06"},{"key":"db_bm12","mat":25,"lab":5,"waste":5,"act":"A06"},{"key":"db_bm16","mat":25,"lab":5,"waste":5,"act":"A06"},{"key":"rb_bm","mat":26,"lab":5,"waste":5,"act":"A06"},{"key":"f_s1","mat":160,"lab":200,"waste":0,"act":"A06"},{"key":"rb_s1","mat":26,"lab":5,"waste":5,"act":"A06"},{"key":"c_bm","mat":2350,"lab":300,"waste":3,"act":"A07"},{"key":"c_s1","mat":2350,"lab":300,"waste":3,"act":"A07"},{"key":"ps","mat":330,"lab":60,"waste":2,"act":"A09"},{"key":"rb_top","mat":27,"lab":5,"waste":5,"act":"A09"},{"key":"c_top","mat":2350,"lab":300,"waste":3,"act":"A09"}]},{"title":"1.5 งานเสาชั้นบนและบันได","items":[{"key":"c_cu","mat":2350,"lab":350,"waste":3,"act":"A10"},{"key":"f_cu","mat":160,"lab":220,"waste":0,"act":"A10"},{"key":"db_cu","mat":25,"lab":5,"waste":5,"act":"A10"},{"key":"rb_cu","mat":26,"lab":5,"waste":5,"act":"A10"},{"key":"c_st","mat":2350,"lab":350,"waste":3,"act":"A11"},{"key":"f_st","mat":160,"lab":250,"waste":0,"act":"A11"},{"key":"rb_st","mat":26,"lab":5,"waste":5,"act":"A11"}]},{"title":"1.6 งานโครงหลังคาเหล็ก","items":[{"key":"st_150","mat":40,"lab":15,"waste":5,"act":"A12"},{"key":"st_100","mat":40,"lab":15,"waste":5,"act":"A12"},{"key":"st_50","mat":40,"lab":15,"waste":5,"act":"A12"},{"key":"st_i","mat":38,"lab":15,"waste":5,"act":"A12"},{"key":"st_conn","mat":45,"lab":15,"waste":0,"act":"A12"},{"key":"st_paint","mat":3,"lab":2,"waste":0,"act":"A12"}]}]},{"code":"A","title":"หมวดที่ 2 งานสถาปัตยกรรม","subs":[{"title":"2.1 งานผนัง","items":[{"key":"w_aac","mat":230,"lab":110,"waste":3,"act":"A14"},{"key":"w_brick","mat":180,"lab":130,"waste":3,"act":"A14"},{"key":"w_tie","mat":40,"lab":45,"waste":0,"act":"A14"},{"key":"plaster","mat":60,"lab":90,"waste":3,"act":"A18"},{"key":"t_wall","mat":380,"lab":200,"waste":5,"act":"A21"},{"key":"breeze","mat":480,"lab":240,"waste":3,"act":"A19"},{"key":"louvre","mat":1800,"lab":500,"waste":0,"act":"A19"}]},{"title":"2.2 งานพื้นผิว","items":[{"key":"f2","mat":450,"lab":180,"waste":5,"act":"A21"},{"key":"f3","mat":320,"lab":180,"waste":5,"act":"A21"},{"key":"wp","mat":180,"lab":60,"waste":0,"act":"A21"},{"key":"skirt","mat":90,"lab":40,"waste":5,"act":"A21"},{"key":"f4","mat":520,"lab":220,"waste":5,"act":"A22"}]},{"title":"2.3 งานฝ้าเพดาน","items":[{"key":"c1","mat":360,"lab":130,"waste":3,"act":"A20"},{"key":"c2","mat":420,"lab":130,"waste":3,"act":"A20"}]},{"title":"2.4 งานหลังคา","items":[{"key":"r1","mat":280,"lab":90,"waste":5,"act":"A13"},{"key":"ridge","mat":160,"lab":40,"waste":0,"act":"A13"},{"key":"fascia","mat":170,"lab":80,"waste":5,"act":"A13"},{"key":"r2","mat":520,"lab":120,"waste":5,"act":"A13"},{"key":"flash","mat":180,"lab":60,"waste":0,"act":"A13"}]},{"title":"2.5 งานประตู-หน้าต่าง (ไม้เนื้อแข็ง กระจก 6 มม. ติดฟิล์ม รวมอุปกรณ์ HAFELE)","items":[{"key":"op_bf","desc":"ประตูบานเฟี้ยมไม้เนื้อแข็ง-กระจก D1, D2, D3","unit":"ตร.ม.","note":"ขนาดตาม A-10; ดูแผ่น Openings","qty":"open:บานเฟี้ยม","mat":6500,"lab":900,"waste":0,"act":"A23"},{"key":"op_sw","desc":"ประตูบานเปิดไม้เนื้อแข็ง D4, D5","unit":"ตร.ม.","note":"ขนาดตาม A-10","qty":"open:บานเปิด","mat":6000,"lab":800,"waste":0,"act":"A23"},{"key":"op_w","desc":"หน้าต่างไม้เนื้อแข็ง-กระจก AW1–AW4","unit":"ตร.ม.","note":"ขนาดตาม A-11","qty":"open:หน้าต่าง","mat":5200,"lab":700,"waste":0,"act":"A23"}]},{"title":"2.6 งานทาสี","items":[{"key":"paint_ext","mat":48,"lab":45,"waste":5,"act":"A24"},{"key":"paint_int","mat":38,"lab":40,"waste":5,"act":"A24"},{"key":"paint_ceil","mat":32,"lab":38,"waste":5,"act":"A24"},{"key":"paint_bz","mat":40,"lab":45,"waste":5,"act":"A24"}]},{"title":"2.7 งานเบ็ดเตล็ดและส่งมอบ","items":[{"key":"counter","mat":3500,"lab":1800,"waste":0,"act":"A25"},{"key":"acc","mat":3500,"lab":500,"waste":0,"act":"A25"},{"key":"clean","desc":"ทำความสะอาด ขนย้ายเศษวัสดุ ส่งมอบงาน","unit":"งาน","note":"","qty":1,"mat":2000,"lab":8000,"waste":0,"act":"A27"}]}]},{"code":"P","title":"หมวดที่ 3 งานระบบสุขาภิบาลและประปา","subs":[{"title":"3.1 สุขภัณฑ์และอุปกรณ์","items":[{"key":"wc","mat":6000,"lab":800,"waste":0,"act":"A25"},{"key":"lav","mat":3500,"lab":600,"waste":0,"act":"A25"},{"key":"shower","mat":6500,"lab":900,"waste":0,"act":"A25"},{"key":"spray","mat":600,"lab":150,"waste":0,"act":"A25"},{"key":"fd","mat":400,"lab":200,"waste":0,"act":"A16"},{"key":"wm","mat":600,"lab":300,"waste":0,"act":"A16"}]},{"title":"3.2 ระบบท่อน้ำดีและท่อน้ำทิ้งในอาคาร","items":[{"key":"cw_in","mat":55,"lab":45,"waste":5,"act":"A16"},{"key":"cw_main","mat":65,"lab":40,"waste":5,"act":"A16"},{"key":"meter","mat":3000,"lab":800,"waste":0,"act":"A16"},{"key":"p4","mat":190,"lab":80,"waste":5,"act":"A16"},{"key":"p2","mat":75,"lab":50,"waste":5,"act":"A16"}]},{"title":"3.3 ระบบระบายน้ำและบำบัดน้ำเสียภายนอก","items":[{"key":"p8","mat":900,"lab":250,"waste":3,"act":"A17"},{"key":"p_exc","mat":0,"lab":150,"waste":0,"act":"A17"},{"key":"mh","mat":1800,"lab":1000,"waste":0,"act":"A17"},{"key":"gt","mat":4500,"lab":1500,"waste":0,"act":"A17"},{"key":"sat","mat":14000,"lab":4000,"waste":0,"act":"A17"}]}]},{"code":"E","title":"หมวดที่ 4 งานระบบไฟฟ้า","subs":[{"title":"4.1 ระบบไฟฟ้าเข้าอาคารและแผงไฟฟ้า","items":[{"key":"e_meter","mat":9000,"lab":2500,"waste":0,"act":"A15"},{"key":"e_lc","mat":7500,"lab":1500,"waste":0,"act":"A15"},{"key":"e_gnd","mat":1300,"lab":700,"waste":0,"act":"A15"}]},{"title":"4.2 งานเดินสายและจุดใช้งาน","items":[{"key":"e_lpt","mat":420,"lab":330,"waste":0,"act":"A15"},{"key":"e_sw","mat":320,"lab":230,"waste":0,"act":"A15"},{"key":"e_so","mat":480,"lab":300,"waste":0,"act":"A15"},{"key":"e_wp","mat":780,"lab":320,"waste":0,"act":"A15"},{"key":"e_ac","mat":1600,"lab":700,"waste":0,"act":"A15"},{"key":"e_wh","mat":1500,"lab":700,"waste":0,"act":"A15"},{"key":"e_com","mat":380,"lab":220,"waste":0,"act":"A15"}]},{"title":"4.3 ดวงโคมและการทดสอบ","items":[{"key":"e_dl","mat":220,"lab":60,"waste":0,"act":"A26"},{"key":"e_wl","mat":650,"lab":120,"waste":0,"act":"A26"},{"key":"e_test","mat":0,"lab":3000,"waste":0,"act":"A26"}]}]}],"activities":[{"id":"A01","name":"เตรียมพื้นที่ วางผัง งานชั่วคราว","drivers":[],"prod":null,"crews":null,"fixed":5,"preds":[]},{"id":"A02","name":"ตอกเสาเข็ม I-18×18 (20 ต้น)","drivers":["pile"],"prod":8,"crews":1,"fixed":null,"preds":[["A01",0]]},{"id":"A03","name":"ขุดดินฐานราก ตัดหัวเข็ม ทราย-คอนกรีตหยาบ","drivers":["exc"],"prod":15,"crews":1,"fixed":null,"preds":[["A02",0]]},{"id":"A04","name":"ฐานราก F1 + ตอม่อ: ตั้งแบบ ผูกเหล็ก เทคอนกรีต","drivers":["f_ft","f_cl"],"prod":8,"crews":2,"fixed":null,"preds":[["A03",0]]},{"id":"A05","name":"บ่มคอนกรีต ถมดินกลับ บดอัด","drivers":[],"prod":null,"crews":null,"fixed":4,"preds":[["A04",0]]},{"id":"A06","name":"คานพื้น + พื้น S1: ตั้งแบบ ผูกเหล็ก","drivers":["f_bm","f_s1"],"prod":8,"crews":3,"fixed":null,"preds":[["A05",0]]},{"id":"A07","name":"เทคอนกรีตคานและพื้น S1","drivers":["c_bm","c_s1"],"prod":12,"crews":1,"fixed":null,"preds":[["A06",0]]},{"id":"A08","name":"บ่มคอนกรีตคาน/พื้น","drivers":[],"prod":null,"crews":null,"fixed":7,"preds":[["A07",0]]},{"id":"A09","name":"วางแผ่นพื้น PS ผูกเหล็กกันร้าว เททับหน้า","drivers":["ps"],"prod":40,"crews":1,"fixed":null,"preds":[["A08",0]]},{"id":"A10","name":"เสา C1 ชั้นบน: ตั้งแบบ ผูกเหล็ก เทคอนกรีต","drivers":["f_cu"],"prod":6,"crews":2,"fixed":null,"preds":[["A07",3]]},{"id":"A11","name":"บันได ST-1 ด้านหน้าและด้านหลัง","drivers":["f_st"],"prod":5,"crews":1,"fixed":null,"preds":[["A08",0]]},{"id":"A12","name":"ประกอบ-ติดตั้งโครงหลังคาเหล็ก ทาสีกันสนิม","drivers":["st_150","st_100","st_50","st_i"],"prod":250,"crews":2,"fixed":null,"preds":[["A10",7]]},{"id":"A13","name":"มุงหลังคา R1/R2 ครอบสัน เชิงชาย-ปั้นลม","drivers":["r1","r2"],"prod":30,"crews":2,"fixed":null,"preds":[["A12",0]]},{"id":"A14","name":"ก่อผนังอิฐมวลเบา/อิฐมอญ เสาเอ็น-ทับหลัง","drivers":["w_aac","w_brick"],"prod":10,"crews":2,"fixed":null,"preds":[["A09",0],["A10",7]]},{"id":"A15","name":"ไฟฟ้า: ตู้ไฟ ระบบเข้าอาคาร เดินท่อ-สาย จุดใช้งาน","drivers":["e_lpt","e_sw","e_so","e_wp","e_ac","e_wh","e_com"],"prod":8,"crews":1,"fixed":null,"preds":[["A14",-4]]},{"id":"A16","name":"สุขาภิบาล: ท่อน้ำดี ท่อโสโครก ท่อน้ำทิ้งในอาคาร","drivers":["cw_in","p4","p2"],"prod":15,"crews":1,"fixed":null,"preds":[["A14",-4]]},{"id":"A17","name":"ท่อระบายรอบอาคาร บ่อพัก บ่อดักไขมัน ถังบำบัด","drivers":["p8"],"prod":8,"crews":1,"fixed":null,"preds":[["A09",0]]},{"id":"A18","name":"ฉาบปูนภายใน-ภายนอก","drivers":["plaster"],"prod":15,"crews":2,"fixed":null,"preds":[["A14",-3],["A15",-2],["A16",-2]]},{"id":"A19","name":"ผนังบล็อกช่องลม AW5/AW6 และระแนงไม้","drivers":["breeze"],"prod":5,"crews":1,"fixed":null,"preds":[["A12",0]]},{"id":"A20","name":"ฝ้าเพดาน C1/C2 พร้อมฉนวน","drivers":["c1","c2"],"prod":12,"crews":1,"fixed":null,"preds":[["A18",0],["A13",0]]},{"id":"A21","name":"กันซึม ปูกระเบื้องพื้น-ผนังห้องน้ำ บัวเชิงผนัง","drivers":["f2","f3","t_wall"],"prod":10,"crews":1,"fixed":null,"preds":[["A18",0],["A20",-3]]},{"id":"A22","name":"พื้นไม้เนื้อเทียมเฉลียง ระเบียง ซักรีด","drivers":["f4"],"prod":10,"crews":1,"fixed":null,"preds":[["A13",0],["A11",0]]},{"id":"A23","name":"ติดตั้งวงกบ ประตู หน้าต่าง","drivers":["OPEN"],"prod":4,"crews":2,"fixed":null,"preds":[["A18",-2]]},{"id":"A24","name":"ทาสีภายใน-ภายนอก ฝ้า บล็อกช่องลม","drivers":["paint_ext","paint_int","paint_ceil","paint_bz"],"prod":40,"crews":2,"fixed":null,"preds":[["A20",0],["A21",-3],["A23",-3]]},{"id":"A25","name":"ติดตั้งสุขภัณฑ์ เคาน์เตอร์ อุปกรณ์ห้องน้ำ","drivers":[],"prod":null,"crews":null,"fixed":5,"preds":[["A21",0],["A24",-3]]},{"id":"A26","name":"ติดตั้งโคมไฟ สวิตช์ เต้ารับ ทดสอบระบบไฟฟ้า","drivers":[],"prod":null,"crews":null,"fixed":5,"preds":[["A24",-3],["A20",0]]},{"id":"A27","name":"ทำความสะอาด ทดสอบระบบ ตรวจรับ ส่งมอบ","drivers":[],"prod":null,"crews":null,"fixed":5,"preds":[["A25",0],["A26",0],["A22",0]]}],"plan":{"start":"2027-01-04","holidays":["2027-01-01","2027-04-06","2027-04-13","2027-04-14","2027-04-15","2027-05-04","2027-06-03","2027-07-28"],"weather":[0.02,0.03,0.04,0.06,0.12,0.15,0.18,0.22,0.25,0.15,0.05,0.02],"factorF":[[0,1.32],[1000000.0,1.3018],[2000000.0,1.2827],[3000000.0,1.2724],[4000000.0,1.2662],[5000000.0,1.262],[10000000.0,1.2481],[15000000.0,1.2394],[20000000.0,1.2337],[25000000.0,1.2296],[30000000.0,1.2264]],"useFactorF":true}}</script>
+<script id="tpl-culvert" type="application/json">{"schema":"culvert-1","type":"culvert","name":"ท่อลอดคลองส่งน้ำ 2×2.10×2.10 (ตัวอย่าง)","meta":{"source":"แบบมาตรฐานกรมชลประทาน มฐ04-62 ท่อลอดคลองส่งน้ำ ค.ส.ล. (14 แผ่น) — ขนาด ระดับ และราคาเป็นค่าสมมติ","refEstimate":null},"culvert":{"size":"2.10","barrels":2,"method":"cast","alignment":"straight","lengthUp":"auto","lengthDn":"auto","row":null},"levels":{"ground":100.0,"el1":98.0,"el3":97.9,"el5":97.7,"el6":97.55},"canal":{"bed":101.0,"lining":0.1,"bankTop":102.8,"b":3.0,"z":1.5,"crest":3.0,"outer":1.5,"modelLength":24},"site":{"workSpace":0.5,"excSlope":1.0},"takeoffDesc":{"mob":["เคลื่อนย้ายเครื่องจักร สำรวจ วางผัง หมุดระดับ","งาน","เหมารวม (สมมติ)"],"coffer":["ทำนบดินชั่วคราวและร่องผันน้ำ รื้อถอนเมื่อเสร็จ","งาน","เหมารวม (สมมติ)"],"dewater":["สูบน้ำระหว่างก่อสร้าง","งาน","เหมารวม (สมมติ)"],"clear":["ถางป่า ขุดตอ ลอกหน้าดิน","ตร.ม.",""],"exc":["ขุดดินด้วยเครื่องจักร","ลบ.ม.",""],"bf":["ถมดินกลับรอบโครงสร้าง บดอัด 95% S.P.C.T.","ลบ.ม.",""],"emb":["ถมดินคันคลองส่งน้ำเหนือแนวท่อ บดอัด 95% (ดินจากบ่อยืม)","ลบ.ม.",""],"lean":["คอนกรีตหยาบหนา 0.05 ม.","ลบ.ม.","ปริมาตรจากรูปทรงโมเดล"],"c_b1":["คอนกรีตโครงสร้าง พื้นท่อ","ลบ.ม.",""],"f_b1":["ไม้แบบ พื้นท่อ (ขอบ)","ตร.ม.","ผิวข้างพื้นท่อ"],"r_b1":["เหล็กเสริม SD40 พื้นท่อ","กก.","ตามตารางมาตรฐาน ②③⑤ ระยะเรียงจริง; ความยาวเหล็กแต่ละตัวสมมติจากรูปตัด (ต่อทาบ/งอ +5%)"],"c_b2":["คอนกรีตโครงสร้าง ผนังและพื้นบนท่อ","ลบ.ม.",""],"f_b2":["ไม้แบบ ผนังและพื้นบนท่อ","ตร.ม.","ผนังทุกด้าน + ท้องพื้นบนในช่องน้ำ + ขอบพื้น"],"r_b2":["เหล็กเสริม SD40 ผนังและพื้นบนท่อ","กก.","ตามตารางมาตรฐาน ①③④⑤⑥ ระยะเรียงจริง; ความยาวสมมติจากรูปตัด"],"c_t1":["คอนกรีตโครงสร้าง พื้น เดือย และกำแพงปลาย transition","ลบ.ม.",""],"f_t1":["ไม้แบบ พื้น/กำแพงปลาย transition","ตร.ม.",""],"r_t1":["เหล็กเสริม SD40 พื้น/กำแพงปลาย transition","กก.","DB12@0.20 สองชั้นสองทาง ต่อพื้นที่ระนาบกลาง (ประมาณจากตาราง transition)"],"c_t2":["คอนกรีตโครงสร้าง ผนัง transition และกำแพงหน้าท่อ","ลบ.ม.",""],"f_t2":["ไม้แบบ ผนัง transition และกำแพงหน้าท่อ","ตร.ม.","สองหน้า + สันผนัง"],"r_t2":["เหล็กเสริม SD40 ผนัง transition และกำแพงหน้าท่อ","กก.","DB12@0.20 สองชั้นสองทาง ต่อพื้นที่ผนัง"],"ws_b":["Rubber waterstop type \"B\" รอยต่อท่อกับ transition","ม.",""],"ws_c":["Rubber waterstop type \"C\" รอยต่อหดตัวในท่อ","ม.",""],"filler":["Elastic filler หนา 0.01 ม. + sealing compound","ตร.ม.",""],"grav":["กรวดหรือหินย่อยปนทรายหนา 0.15 ม.","ลบ.ม.","ปริมาตรจากรูปทรงโมเดล"],"rip":["หินเรียงหนา 0.30 ม. (รวมฟันหินปลายร่อง)","ลบ.ม.","ปริมาตรจากรูปทรงโมเดล"],"lining":["คอนกรีตดาดคลองหนา 0.10 ม. คืนสภาพเหนือแนวท่อ","ลบ.ม.",""],"grass":["ปลูกหญ้าคันคลองเหนือแนวท่อ","ตร.ม.",""]},"manualQty":{"mob":{"desc":"เคลื่อนย้ายเครื่องจักร สำรวจ วางผัง หมุดระดับ","unit":"งาน","qty":1,"basis":"เหมารวม (สมมติ)"},"coffer":{"desc":"ทำนบดินชั่วคราวและร่องผันน้ำ รื้อถอนเมื่อเสร็จ","unit":"งาน","qty":1,"basis":"เหมารวม (สมมติ)"},"dewater":{"desc":"สูบน้ำระหว่างก่อสร้าง","unit":"งาน","qty":1,"basis":"เหมารวม (สมมติ)"}},"boq":[{"code":"M","title":"งานเตรียมการ งานชั่วคราว และเบ็ดเตล็ด","subs":[{"title":"1.1 งานเตรียมการและงานชั่วคราว","items":[{"key":"mob","mat":0,"lab":25000,"waste":0,"act":"C01"},{"key":"coffer","mat":30000,"lab":30000,"waste":0,"act":"C01"},{"key":"dewater","mat":15000,"lab":25000,"waste":0,"act":"C02"},{"key":"clear","mat":0,"lab":12,"waste":0,"act":"C01"}]}]},{"code":"G","title":"งานดิน","subs":[{"title":"2.1 งานขุดและถม","items":[{"key":"exc","mat":0,"lab":45,"waste":0,"act":"C02"},{"key":"bf","mat":0,"lab":110,"waste":0,"act":"C09"},{"key":"emb","mat":140,"lab":110,"waste":0,"act":"C11"}]}]},{"code":"C","title":"งานคอนกรีตและเหล็กเสริม","subs":[{"title":"3.1 คอนกรีตหยาบ","items":[{"key":"lean","mat":1850,"lab":350,"waste":5,"act":"C03"}]},{"title":"3.2 พื้นท่อ","items":[{"key":"c_b1","mat":2450,"lab":450,"waste":3,"act":"C04"},{"key":"f_b1","mat":180,"lab":170,"waste":0,"act":"C04"},{"key":"r_b1","mat":26,"lab":4,"waste":5,"act":"C04"}]},{"title":"3.3 พื้น transition","items":[{"key":"c_t1","mat":2450,"lab":450,"waste":3,"act":"C05"},{"key":"f_t1","mat":180,"lab":170,"waste":0,"act":"C05"},{"key":"r_t1","mat":26,"lab":4,"waste":5,"act":"C05"}]},{"title":"3.4 ผนังและพื้นบนท่อ","items":[{"key":"c_b2","mat":2450,"lab":500,"waste":3,"act":"C06"},{"key":"f_b2","mat":220,"lab":200,"waste":0,"act":"C06"},{"key":"r_b2","mat":26,"lab":4,"waste":5,"act":"C06"}]},{"title":"3.5 ผนัง transition และกำแพงหน้าท่อ","items":[{"key":"c_t2","mat":2450,"lab":500,"waste":3,"act":"C07"},{"key":"f_t2","mat":220,"lab":200,"waste":0,"act":"C07"},{"key":"r_t2","mat":26,"lab":4,"waste":5,"act":"C07"}]},{"title":"3.6 รอยต่อ","items":[{"key":"ws_b","mat":420,"lab":60,"waste":5,"act":"C04"},{"key":"ws_c","mat":520,"lab":60,"waste":5,"act":"C04"},{"key":"filler","mat":220,"lab":60,"waste":5,"act":"C06"}]}]},{"code":"R","title":"งานป้องกันการกัดเซาะและคืนสภาพคลอง","subs":[{"title":"4.1 หินเรียง","items":[{"key":"grav","mat":650,"lab":150,"waste":5,"act":"C10"},{"key":"rip","mat":780,"lab":420,"waste":5,"act":"C10"}]},{"title":"4.2 คืนสภาพคลอง","items":[{"key":"lining","mat":2300,"lab":600,"waste":3,"act":"C11"},{"key":"grass","mat":15,"lab":15,"waste":0,"act":"C11"}]}]}],"activities":[{"id":"C01","name":"เตรียมพื้นที่ วางผัง ทำนบชั่วคราว ผันน้ำ","drivers":[],"prod":null,"crews":null,"fixed":6,"preds":[]},{"id":"C02","name":"ขุดดิน สูบน้ำ","drivers":["exc"],"prod":150,"crews":1,"fixed":null,"preds":[["C01",0]]},{"id":"C03","name":"คอนกรีตหยาบรองพื้น","drivers":["lean"],"prod":6,"crews":1,"fixed":null,"preds":[["C02",0]]},{"id":"C04","name":"พื้นท่อ + waterstop (เหล็ก แบบ เท)","drivers":["c_b1"],"prod":8,"crews":1,"fixed":null,"preds":[["C03",0]]},{"id":"C05","name":"พื้น เดือย กำแพงปลาย transition","drivers":["c_t1"],"prod":6,"crews":1,"fixed":null,"preds":[["C03",0]]},{"id":"C06","name":"ผนังและพื้นบนท่อ","drivers":["c_b2"],"prod":5,"crews":1,"fixed":null,"preds":[["C04",3]]},{"id":"C07","name":"ผนัง transition และกำแพงหน้าท่อ","drivers":["c_t2"],"prod":3,"crews":1,"fixed":null,"preds":[["C05",3],["C06",0]]},{"id":"C08","name":"บ่มคอนกรีต ถอดแบบ","drivers":[],"prod":null,"crews":null,"fixed":7,"preds":[["C07",0]]},{"id":"C09","name":"ถมดินกลับบดอัดรอบโครงสร้าง","drivers":["bf"],"prod":100,"crews":1,"fixed":null,"preds":[["C08",0]]},{"id":"C10","name":"กรวดรองพื้นและหินเรียง","drivers":["grav","rip"],"prod":20,"crews":1,"fixed":null,"preds":[["C08",0]]},{"id":"C11","name":"ถมคันคลอง ดาดคลองคืนสภาพ ปลูกหญ้า","drivers":["emb","lining"],"prod":120,"crews":1,"fixed":null,"preds":[["C09",0]]},{"id":"C12","name":"รื้อทำนบ ทำความสะอาด ส่งมอบ","drivers":[],"prod":null,"crews":null,"fixed":4,"preds":[["C10",0],["C11",0]]}],"plan":{"start":"2027-01-04","holidays":["2027-01-01","2027-04-06","2027-04-13","2027-04-14","2027-04-15","2027-05-04","2027-06-03","2027-07-28"],"weather":[0.02,0.03,0.04,0.06,0.12,0.15,0.18,0.22,0.25,0.15,0.05,0.02],"factorF":[[0,1.32],[1000000.0,1.3018],[2000000.0,1.2827],[3000000.0,1.2724],[4000000.0,1.2662],[5000000.0,1.262],[10000000.0,1.2481],[15000000.0,1.2394],[20000000.0,1.2337],[25000000.0,1.2296],[30000000.0,1.2264]],"useFactorF":true,"factorFNote":"ใช้ตาราง Factor F งานอาคารเป็นค่าประมาณ — งานชลประทานควรใช้ตาราง Factor F งานชลประทาน"},"ruby":{"module":"CulvertBIM","storeys":{"STR":"Culvert structure","PROT":"Channel protection","CTX":"Canal & site context"},"header":"ท่อลอดคลองส่งน้ำ ค.ส.ล. ตามแบบมาตรฐานกรมชลประทาน มฐ04-62 — โมเดล BIM (SketchUp Ruby)\nสร้างจาก House BIM Studio: ท่อ (แบ่งช่วงตามรอยต่อหดตัว) กำแพงหน้าท่อ transition เดือย กำแพงปลาย\nคอนกรีตหยาบ หินเรียง/กรวดรอง คันคลองและดาดคลอง (บริบท) รวม #COUNT# องค์ประกอบ\nทุกชิ้นเป็น Group: IFC 2x3 classification + attribute 'T03_BIM' + Tag (C-Barrel, C-Headwall, ...)\n\nวิธีใช้ (Window > Ruby Console):\n    load 'C:/path/culvert_BIM.rb.txt'\n    CulvertBIM.build\n    CulvertBIM.report\n\nแกน: x ตามทิศน้ำไหล (ต้นน้ำเป็นลบ, 0 = แนวศูนย์กลางคลอง), y ตามแนวคลอง, z = ระดับ − ระดับดินเดิม (ม.)"}}</script>
+<script id="rb-template" type="text/plain"># encoding: utf-8
+# =============================================================================
+#  TYPE03_House_BIM.rb  -  บ้านโอบกอด TYPE03 (ธอส.)  โมเดล BIM ครบชุด (SketchUp Ruby)  v2.0
+#  แหล่งข้อมูล: แบบ A-01..A-14, S-01..S-09, EE-01..03, SN-01..03  ลงวันที่ 30/07/2566
+#
+#  โครงสร้าง : เสาเข็ม ฐานราก เสา คาน พื้น PS/S1 บันได โครงหลังคาเหล็ก (#COUNT_S# ชิ้น)
+#  สถาปัตย์  : ผนัง P1/P2/P3 เจาะช่องเปิด ประตู D1-D5 หน้าต่าง AW1-AW4 บล็อกช่องลม AW5/AW6
+#              ระแนงไม้ วัสดุพื้น F2/F3/F4 ฝ้า C1/C2 หลังคา R1/R2 ครอบสัน
+#  งานระบบ   : สุขภัณฑ์ ท่อระบาย บ่อพัก ถังบำบัด ดวงโคม ตู้ไฟ (LOD 100-200)
+#  รวม #COUNT# องค์ประกอบ  ทุกชิ้นเป็น Group: IFC 2x3 classification + attribute 'T03_BIM' + Tag
+#
+#  วิธีใช้ (Window > Ruby Console):
+#      load 'C:/path/TYPE03_House_BIM.rb'
+#      Type03BIM.build                     # สร้างโมเดลทั้งหลัง (ลบของเดิมที่สคริปต์นี้สร้างก่อน)
+#      Type03BIM.build(only: [:structure]) # :structure / :architecture / :mep  เลือกบางหมวด
+#      Type03BIM.report                    # ปริมาณงาน + ตารางประตูหน้าต่าง
+#      Type03BIM.export_csv('C:/temp/type03')   # เขียน _qto.csv และ _schedule.csv
+#      Type03BIM.clashes                   # ตรวจชนกัน (bounding box, ไม่รวมรอยต่อโครงสร้าง)
+#      Type03BIM.show(:structure)          # :structure / :architecture / :mep / :all
+#  ส่งออก IFC: File > Export > 3D Model > IFC (SketchUp Pro) — ใช้ classification ที่สคริปต์ใส่ให้
+#
+#  หน่วย = เมตร ; X: แกน 1..4 = 0, 6, 11, 15 ; Y: แถว E..A = 0, 2, 6, 10, 12 (A อยู่ด้านบนของผัง)
+#  Z: ดิน ±0.00 ; FFL ห้อง +0.70 ; ห้องน้ำ +0.65 ; เฉลียง +0.60 ; สัน R1 +5.55 ; สัน R2 +4.76
+#  ค่าที่สมมติ (ไม่มีในแบบ) ระบุไว้ใน attribute 'Note' ของแต่ละชิ้น
+# =============================================================================
+module Type03BIM
+  NAME   = 'TYPE03 House BIM'
+  SCHEMA = 'IFC 2x3'
+  # name => [r, g, b, alpha]
+  MATS = {
+    'concrete'=>[196,194,188,1.0], 'concrete_dark'=>[150,148,142,1.0], 'steel'=>[70,110,150,1.0],
+    'wall_ext'=>[236,230,216,1.0], 'wall_int'=>[245,242,235,1.0], 'wall_bath'=>[200,215,220,1.0],
+    'wood'=>[140,95,60,1.0], 'glass'=>[150,200,190,0.35], 'breeze'=>[240,238,232,1.0],
+    'tile_floor'=>[222,218,210,1.0], 'tile_bath'=>[190,205,210,1.0], 'deck'=>[160,120,85,1.0],
+    'ceiling'=>[250,250,248,1.0], 'roof'=>[120,120,118,1.0], 'roof_clear'=>[210,230,235,0.45],
+    'sanitary'=>[252,252,252,1.0], 'pipe'=>[90,90,90,1.0], 'light'=>[255,240,170,1.0],
+    'panel'=>[60,60,60,1.0], 'ground'=>[150,175,120,1.0],
+    'lean'=>[170,168,160,1.0], 'riprap'=>[128,118,104,1.0], 'gravel'=>[188,176,150,1.0], 'earth'=>[176,150,110,0.35], 'lining'=>[205,203,196,1.0]
+  }
+  STOREYS = { 'FND'=>'Foundation & drainage (below ±0.00)', 'GF'=>'Ground floor (FFL +0.70)', 'ROOF'=>'Roof' }
+  DISC = { structure: /\A[SC]-/, architecture: /\AA-/, mep: /\A[PE]-/ }
+
+  # [ifc, name, mark, level, tag, parts, attrs]
+  #  part: [:box, x0,x1,y0,y1,z0,z1, mat] | [:poly, [[x,y,z]..], [nx,ny,nz], thick, mat] | [:bar, p1, p2, b, h, mat]
+  DATA = [
+#DATA#
+  ]
+
+  # ---------------------------------------------------------------- helpers
+  def self.pt(a); Geom::Point3d.new(a[0].to_f.m, a[1].to_f.m, a[2].to_f.m); end
+
+  def self.material(model, key)
+    name = "T03_#{key}"
+    mt = model.materials[name]
+    return mt if mt
+    mt = model.materials.add(name)
+    r, g, b, a = MATS[key] || [200,200,200,1.0]
+    mt.color = Sketchup::Color.new(r, g, b)
+    mt.alpha = a if a < 1.0
+    mt
+  end
+
+  def self.tag(model, name); model.layers[name] || model.layers.add(name); end
+
+  # face -> solid, extruded along 'dir'; sign taken from the face normal, never guessed
+  def self.extrude(ents, pts, dir, len)
+    f = ents.add_face(pts)
+    f.reverse! if f.normal.dot(dir) < 0
+    f.pushpull(len.m)
+    f
+  end
+
+  def self.build_part(ents, part)
+    case part[0]
+    when :box
+      _, x0, x1, y0, y1, z0, z1, _m = part
+      pts = [[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0]].map { |p| pt(p) }
+      extrude(ents, pts, Geom::Vector3d.new(0,0,1), z1 - z0)
+    when :poly
+      _, pts, n, t, _m = part
+      extrude(ents, pts.map { |p| pt(p) }, Geom::Vector3d.new(*n), t)
+    when :bar
+      _, p1, p2, b, h, _m = part
+      u = Geom::Vector3d.new(p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2])
+      len = u.length.to_f                  # metres (vector built from raw metre numbers)
+      u = u.normalize
+      side = u.cross(Geom::Vector3d.new(0,0,1))
+      side = Geom::Vector3d.new(1,0,0) if side.length < 1e-6
+      side = side.normalize
+      up = side.cross(u).normalize
+      up = up.reverse if up.z < 0
+      c = pt(p1)
+      pts = [[-1,-1],[1,-1],[1,1],[-1,1]].map { |sx, sy| c.offset(side, sx*b.m/2).offset(up, sy*h.m/2) }
+      extrude(ents, pts, u, len)
+    end
+  end
+
+  def self.ifc_ready?(model)
+    return @ifc_ok unless @ifc_ok.nil?
+    @ifc_ok = begin
+      cl = model.classifications
+      unless cl[SCHEMA]
+        file = Sketchup.find_support_file("#{SCHEMA}.skc", 'Classifications')
+        cl.load_schema(file) if file
+      end
+      !cl[SCHEMA].nil?
+    rescue StandardError
+      false
+    end
+  end
+
+  def self.classify(model, grp, ifc)
+    return unless ifc_ready?(model)
+    grp.definition.add_classification(SCHEMA, ifc)
+  rescue StandardError
+    nil
+  end
+
+  def self.volume(part)
+    case part[0]
+    when :box then (part[2]-part[1]) * (part[4]-part[3]) * (part[6]-part[5])
+    when :bar then Math.sqrt((0..2).sum { |i| (part[2][i]-part[1][i])**2 }) * part[3] * part[4]
+    when :poly
+      pts, n, t = part[1], part[2], part[3]
+      s = [0.0, 0.0, 0.0]
+      pts.each_with_index do |a, i|
+        b = pts[(i+1) % pts.size]
+        s[0] += a[1]*b[2] - a[2]*b[1]; s[1] += a[2]*b[0] - a[0]*b[2]; s[2] += a[0]*b[1] - a[1]*b[0]
+      end
+      nl = Math.sqrt(n.sum { |v| v*v })
+      ((s[0]*n[0] + s[1]*n[1] + s[2]*n[2]).abs / nl / 2.0) * t
+    end
+  end
+
+  def self.selected(row, only)
+    return true if only.nil?
+    Array(only).any? { |d| row[4] =~ DISC[d] }
+  end
+
+  # ---------------------------------------------------------------- build
+  def self.build(only: nil)
+    model = Sketchup.active_model
+    model.start_operation('Build TYPE03 BIM', true)
+    clear_existing(model)
+    root = model.active_entities.add_group
+    root.name = NAME
+    root.set_attribute('T03_ROOT', 'built', true)
+    classify(model, root, 'IfcBuilding')
+    storeys = {}
+    STOREYS.each do |k, label|
+      s = root.entities.add_group
+      s.name = label
+      classify(model, s, 'IfcBuildingStorey')
+      storeys[k] = s
+    end
+    n = 0
+    DATA.each do |row|
+      next unless selected(row, only)
+      ifc, name, mark, lvl, tagname, parts, attrs = row
+      host = storeys[lvl] || storeys['GF']
+      g = host.entities.add_group
+      if parts.size == 1
+        build_part(g.entities, parts[0])
+        g.material = material(model, parts[0].last)
+      else
+        parts.each do |p|
+          sub = g.entities.add_group
+          build_part(sub.entities, p)
+          sub.material = material(model, p.last)
+          sub.layer = tag(model, tagname)
+        end
+      end
+      g.name = name
+      g.layer = tag(model, tagname)
+      classify(model, g, ifc)
+      g.set_attribute('T03_BIM', 'IfcClass', ifc)
+      g.set_attribute('T03_BIM', 'Mark', mark)
+      g.set_attribute('T03_BIM', 'Level', lvl)
+      attrs.each { |k, v| g.set_attribute('T03_BIM', k, v) }
+      g.set_attribute('T03_BIM', 'Volume_m3', parts.sum { |p| volume(p) }.round(4))
+      n += 1
+    end
+    make_scenes(model)
+    model.commit_operation
+    puts "#{NAME}: built #{n} elements (IFC classification #{ifc_ready?(model) ? 'ON' : 'OFF - schema not found'})"
+    n
+  end
+
+  def self.clear_existing(model)
+    model.active_entities.grep(Sketchup::Group).each do |g|
+      g.erase! if g.valid? && g.get_attribute('T03_ROOT', 'built')
+    end
+  end
+
+  def self.make_scenes(model)
+    return unless model.respond_to?(:pages) && model.pages
+    [['01 Structure', :structure], ['02 Architecture', :architecture], ['03 MEP', :mep], ['04 All', :all]].each do |nm, w|
+      show(w)
+      pg = model.pages[nm]
+      pg ? pg.update : model.pages.add(nm)
+    end
+    show(:all)
+  rescue StandardError => e
+    puts "scenes skipped: #{e.message}"
+  end
+
+  def self.show(what = :all)
+    model = Sketchup.active_model
+    model.layers.each do |l|
+      next unless l.name =~ /\A[SAPEC]-|\ASite\z/
+      l.visible = case what
+                  when :all then true
+                  when :structure then l.name.start_with?('S-', 'C-') || l.name == 'Site'
+                  when :architecture then !l.name.start_with?('P-', 'E-')
+                  when :mep then l.name.start_with?('P-', 'E-', 'S-Column', 'S-Foundation') || l.name == 'A-Floor'
+                  else true
+                  end
+    end
+  end
+
+  # ---------------------------------------------------------------- quantities / schedules
+  STEEL_KGM = { 'PRIMARY'=>7.06, 'RIDGE'=>7.06, 'EAVE'=>7.06, 'RAFTER'=>7.20, 'DECK-RAFTER'=>7.20,
+                'PURLIN'=>3.45, 'DECK-I'=>14.0, 'DECK-I-NS'=>14.0 }
+
+  def self.qto
+    rows = Hash.new { |h, k| h[k] = { count: 0, vol: 0.0, area: 0.0, len: 0.0, kg: 0.0 } }
+    DATA.each do |ifc, name, mark, lvl, tagname, parts, attrs|
+      r = rows[[tagname, ifc.sub('Ifc', ''), mark]]
+      r[:count] += 1
+      r[:vol] += parts.sum { |p| volume(p) }
+      r[:area] += (attrs['NetArea_m2(one face)'] || attrs['Area_m2'] || attrs['SlopeArea_m2'] || 0).to_f
+      if parts[0][0] == :bar
+        l = parts.sum { |p| Math.sqrt((0..2).sum { |i| (p[2][i]-p[1][i])**2 }) }
+        r[:len] += l
+        r[:kg] += l * (STEEL_KGM[mark] || 0)
+      end
+    end
+    rows
+  end
+
+  def self.schedule
+    DATA.select { |r| %w[IfcDoor IfcWindow].include?(r[0]) }.map do |ifc, name, mark, lvl, tg, parts, a|
+      [mark, name, ifc.sub('Ifc', ''), a['Size_WxH_m'], a['Leaves'], a['Description'], a['SillFromFloor_m']]
+    end.sort
+  end
+
+  def self.report
+    puts '%-14s %-24s %-12s %5s %9s %9s %8s %8s' % %w[Tag Class Mark Count Vol_m3 Area_m2 Len_m kg]
+    qto.sort.each do |(t, c, m), r|
+      puts '%-14s %-24s %-12s %5d %9.2f %9.2f %8.1f %8.0f' % [t, c, m, r[:count], r[:vol], r[:area], r[:len], r[:kg]]
+    end
+    conc = DATA.select { |r| r[4] =~ /\AS-(Foundation|Column|Beam|Slab|Stair)/ }.sum { |r| r[5].sum { |p| volume(p) } }
+    puts 'RC concrete incl. piles: %.2f m3 ; roof steel: %.0f kg' % [conc, qto.values.sum { |r| r[:kg] }]
+    puts "\nDOOR / WINDOW SCHEDULE"
+    schedule.each { |r| puts r.map(&:to_s).join(' | ') }
+    nil
+  end
+
+  def self.export_csv(prefix)
+    File.open("#{prefix}_qto.csv", 'w:UTF-8') do |f|
+      f.puts "\uFEFFTag,Class,Mark,Count,Volume_m3,Area_m2,Length_m,Steel_kg"
+      qto.sort.each { |(t, c, m), r| f.puts [t, c, m, r[:count], r[:vol].round(3), r[:area].round(2), r[:len].round(2), r[:kg].round(1)].join(',') }
+    end
+    File.open("#{prefix}_schedule.csv", 'w:UTF-8') do |f|
+      f.puts "\uFEFFMark,Name,Class,Size_WxH_m,Leaves,Description,Sill_m"
+      schedule.each { |r| f.puts r.map { |v| v.to_s.include?(',') ? "\"#{v}\"" : v.to_s }.join(',') }
+    end
+    puts "wrote #{prefix}_qto.csv and #{prefix}_schedule.csv"
+  end
+
+  # ---------------------------------------------------------------- clash check (part bounding boxes)
+  def self.part_bbox(p)
+    case p[0]
+    when :box then [p[1], p[2], p[3], p[4], p[5], p[6]]
+    when :poly
+      pts = p[1]; n = p[2]; t = p[3]; nl = Math.sqrt(n.sum { |v| v*v })
+      all = pts + pts.map { |q| (0..2).map { |i| q[i] + n[i]/nl*t } }
+      (0..2).flat_map { |i| [all.map { |q| q[i] }.min, all.map { |q| q[i] }.max] }
+    when :bar
+      a, b, w, h = p[1], p[2], p[3], p[4]; r = [w, h].max / 2.0
+      (0..2).flat_map { |i| [[a[i], b[i]].min - r, [a[i], b[i]].max + r] }
+    end
+  end
+
+  def self.clashes(tol = 0.005)
+    items = []
+    DATA.each_with_index do |r, i|
+      next if r[4].start_with?('S-') || r[4] == 'Site' || r[4] == 'P-Drainage' || r[4] == 'A-Roof'
+      r[5].each { |p| items << [i, part_bbox(p)] }
+    end
+    struct = []
+    DATA.each_with_index do |r, i|
+      next unless r[4] =~ /\AS-(Column|Beam|Slab|Stair)/
+      r[5].each { |p| struct << [i, part_bbox(p)] }
+    end
+    found = Hash.new(0)
+    ov = ->(a, b) { (0..2).all? { |k| [a[2*k+1], b[2*k+1]].min - [a[2*k], b[2*k]].max > tol } }
+    items.each_with_index do |(i, a), n|
+      items[(n+1)..-1].each { |(j, b)| found[[DATA[i][1], DATA[j][1]]] += 1 if i != j && ov.(a, b) }
+      struct.each { |(j, b)| found[[DATA[i][1], DATA[j][1]]] += 1 if ov.(a, b) }
+    end
+    puts "#{found.size} bbox overlaps between architecture/MEP and structure (sloped-roof bboxes excluded)"
+    found.first(80).each { |k, v| puts "  #{k[0]}  x  #{k[1]}" }
+    found
+  end
+end
+
+puts "TYPE03 BIM script loaded (#{Type03BIM::DATA.size} elements). Run: Type03BIM.build"
+</script>
+<script>/* House BIM engine: spec -> elements -> takeoff -> BOQ -> schedule/CPM -> S-curve ; clash check ; SketchUp Ruby export.
+   Units: metres. Pure functions, no DOM. */
+(function (root) {
+'use strict';
+const KG = { RB6: 0.222, RB9: 0.499, DB12: 0.888, DB16: 1.578, DB20: 2.466 };
+const r4 = v => Math.round(v * 1e4) / 1e4;
+const g = v => String(r4(v));                    // python "{:g}" for our values
+const ceilx = x => Math.ceil(x - 1e-9);
+const SMAT = { IfcPile: 'concrete_dark', IfcFooting: 'concrete_dark', IfcColumn: 'concrete', IfcBeam: 'concrete', IfcSlab: 'concrete', IfcStair: 'concrete' };
+const STAG = { IfcPile: 'S-Foundation', IfcFooting: 'S-Foundation', IfcColumn: 'S-Column', IfcBeam: 'S-Beam', IfcSlab: 'S-Slab', IfcStair: 'S-Stair', IfcMember: 'S-RoofSteel' };
+
+// ------------------------------------------------------------------ roofs
+function gableFn(gb) {
+  const s = (gb.ridgeZ - gb.eaveZ) / gb.eaveDX;
+  return x => gb.ridgeZ - s * Math.abs(x - gb.ridgeX);
+}
+function deckFn(d) {
+  const t = Math.tan(d.deg * Math.PI / 180);
+  return x => d.z0 - t * Math.min(x - d.xa, d.xb - x);
+}
+
+// ------------------------------------------------------------------ generate
+function generate(spec) {
+  const E = [];
+  const add = (ifc, name, mark, level, tag, parts, attrs) => E.push({ ifc, name, mark, level, tag, parts, attrs: attrs || {} });
+  const L = spec.levels, F = spec.foundation, C = spec.columns, RS = spec.roofStack;
+  const GX = spec.grid.x, GY = spec.grid.y;
+  const gables = (spec.roofs.gables || []).map(gb => Object.assign({}, gb, { z: gableFn(gb) }));
+  const gByTag = {}; gables.forEach(gb => gByTag[gb.tag] = gb);
+  const dzP = -RS.purlin - RS.rafter - RS.primary / 2, dzR = -RS.purlin - RS.rafter / 2, dzU = -RS.purlin / 2 - (RS.purlinDrop || 0);
+  const sbox = (ifc, name, mark, level, b, attrs) => add(ifc, name, mark, level, STAG[ifc], [['B', b[0], b[1], b[2], b[3], b[4], b[5], SMAT[ifc]]], attrs);
+
+  // foundations + lower columns
+  const fh = F.footing.h, fb = F.footing.b / 2, ps = F.pile.size / 2, lo = C.lower.size / 2;
+  for (const [c, x] of Object.entries(GX)) for (const [r, y] of Object.entries(GY)) {
+    const n = r + c;
+    sbox('IfcPile', 'PILE-' + n, F.pile.mark, 'FND', [x - ps, x + ps, y - ps, y + ps, L.footingTop - fh - F.pile.length + F.pile.embed, L.footingTop - fh + F.pile.embed],
+      { Section: F.pile.mark, SafeLoad_t: F.pile.safeLoad_t, Length_m: F.pile.length });
+    sbox('IfcFooting', F.footing.mark + '-' + n, F.footing.mark, 'FND', [x - fb, x + fb, y - fb, y + fb, L.footingTop - fh, L.footingTop],
+      { Size: `${F.footing.b}x${F.footing.b}x${fh}` });
+    sbox('IfcColumn', 'C1L-' + n, 'C1', 'GF', [x - lo, x + lo, y - lo, y + lo, L.footingTop, L.beamTop], { Section: `${C.lower.size}x${C.lower.size}`, Bars: `${C.lower.bars}-${C.lower.bar}` });
+  }
+  // upper columns: top = underside of the gable primary frame that sits on it, else override
+  const up = C.upper.size / 2;
+  for (const [c, x] of Object.entries(GX)) for (const [r, y] of Object.entries(GY)) {
+    let top = (C.topOverride || {})[r + c];
+    if (top == null) {
+      const gb = gables.find(q => x >= q.xL - 1e-9 && x <= q.xR + 1e-9 && q.frames.some(f => Math.abs(f - y) < 1e-6));
+      top = gb ? gb.z(x) + dzP - RS.primary / 2 : L.beamTop + 2.8;
+    }
+    sbox('IfcColumn', `C1U-${r}${c}`, 'C1', 'GF', [x - up, x + up, y - up, y + up, L.beamTop, Math.round(top * 1000) / 1000], { Section: `${C.upper.size}x${C.upper.size}`, Bars: `${C.upper.bars}-${C.upper.bar}` });
+  }
+  // beams
+  for (const [mark, axis, line, a, b, name] of spec.beams) {
+    const s = spec.beamSections[mark];
+    const bb = axis === 'x' ? [a, b, line - s.b / 2, line + s.b / 2] : [line - s.b / 2, line + s.b / 2, a, b];
+    sbox('IfcBeam', name, mark, 'GF', [...bb, L.beamTop - s.d, L.beamTop], { Section: `${s.b.toFixed(2)}x${s.d.toFixed(2)}`, 'Bars(top/bot)': s.bars, Stirrup: s.stirrup });
+  }
+  for (const [mark, name, x0, x1, y0, y1, z0, z1] of spec.slabs)
+    sbox('IfcSlab', name, mark, 'GF', [x0, x1, y0, y1, z0, z1], { Type: mark === 'PS' ? 'Precast plank + topping' : 'RC slab' });
+  for (const st of spec.stairs) spec.stairLevels.forEach((top, i) => {
+    const ya = st.edge + st.dir * spec.stairTread * i, yb = st.edge + st.dir * spec.stairTread * (i + 1);
+    sbox('IfcStair', `${st.name}-step${i + 1}`, 'ST-1', 'GF', [st.x0, st.x1, Math.min(ya, yb), Math.max(ya, yb), Math.max(top - 0.30, 0), top], { Riser: 0.15, Tread: spec.stairTread });
+  });
+  // roof steel
+  const bar = (name, ifc, mark, p1, p2, b, h, attrs) => add(ifc, name, mark, 'ROOF', 'S-RoofSteel', [['R', p1.map(r4), p2.map(r4), b, h, 'steel']], attrs);
+  for (const gb of gables) {
+    const z = gb.z, RHS = { Section: 'RHS 150x50x2.3' };
+    for (const y of gb.frames) for (const [a, b] of [[gb.xL, gb.ridgeX], [gb.ridgeX, gb.xR]])
+      bar(`${gb.tag}-PRI-y${g(y)}-${a === gb.xL ? 'L' : 'R'}`, 'IfcBeam', 'PRIMARY', [a, y, z(a) + dzP], [b, y, z(b) + dzP], 0.05, RS.primary, RHS);
+    bar(`${gb.tag}-RIDGE`, 'IfcMember', 'RIDGE', [gb.ridgeX, gb.y0, z(gb.ridgeX) + dzP], [gb.ridgeX, gb.y1, z(gb.ridgeX) + dzP], 0.05, RS.primary, RHS);
+    for (const xe of gb.eaveLines) bar(`${gb.tag}-EAVE-x${g(xe)}`, 'IfcMember', 'EAVE', [xe, gb.y0, z(xe) + dzP], [xe, gb.y1, z(xe) + dzP], 0.05, RS.primary, RHS);
+    for (let y = gb.y0; y <= gb.y1 + 1e-9; y += RS.spacing) {
+      if (gb.frames.some(f => Math.abs(f - y) < 1e-6)) continue;
+      for (const [a, b] of [[gb.xL, gb.ridgeX], [gb.ridgeX, gb.xR]])
+        bar(`${gb.tag}-RAF-y${g(y)}-${a === gb.xL ? 'L' : 'R'}`, 'IfcMember', 'RAFTER', [a, y, z(a) + dzR], [b, y, z(b) + dzR], 0.05, RS.rafter, { Section: 'RHS 100x50x3.2 @1.00' });
+    }
+    const px = [];
+    for (let x = gb.ridgeX; x > gb.xL + 1e-9; x -= RS.spacing) px.push(x);
+    px.push(gb.xL);
+    for (let x = gb.ridgeX + RS.spacing; x < gb.xR - 1e-9; x += RS.spacing) px.push(x);
+    px.push(gb.xR);
+    [...new Set(px.map(r4))].sort((a, b) => a - b).forEach(x =>
+      bar(`${gb.tag}-PUR-x${g(x)}`, 'IfcMember', 'PURLIN', [x, gb.y0, z(x) + dzU], [x, gb.y1, z(x) + dzU], 0.05, RS.purlin, { Section: 'RHS 50x50x2.3 @1.00' }));
+  }
+  const D = spec.roofs.deck;
+  if (D) {
+    const zd = deckFn(D), H = 0.075, IB = { Section: 'I 150x75x5.5x9.5' };
+    for (const [y, a, b, name] of D.ew) bar(name, 'IfcBeam', 'DECK-I', [a, y, zd(a) - H], [b, y, zd(b) - H], 0.075, 0.15, IB);
+    for (const [x, y0, y1] of D.ns) bar(`DK-NS-x${g(x)}`, 'IfcBeam', 'DECK-I-NS', [x, y0, zd(x) - H - D.nsDrop], [x, y1, zd(x) - H - D.nsDrop], 0.075, 0.15, IB);
+    for (const [y, a, b] of D.rafters) bar(`DK-RAF-y${g(y)}-${g(a)}`, 'IfcMember', 'DECK-RAFTER', [a, y, zd(a) - 0.075 - 0.05], [b, y, zd(b) - 0.075 - 0.05], 0.05, RS.rafter, { Section: 'RHS 100x50x3.2 @1.00' });
+  }
+
+  // ---------------- walls + openings
+  const T = spec.wallT, FFL = L.ffl;
+  const unitMap = spec.units;
+  const topOf = (w) => {
+    if (typeof w.top === 'number') return { f: () => w.top };
+    if (String(w.top).startsWith('roof:')) {
+      const gb = gByTag[w.top.slice(5)];
+      if (w.axis === 'y') { const v = gb.z(w.c) - 0.30; return { f: () => v }; }
+      return { f: s => gb.z(s) - 0.30, ridge: w.ridge ? gb.ridgeX : null };
+    }
+    const v = L[w.top]; return { f: () => v };
+  };
+  const DOORSPEC = { Frame: 'Hardwood 2"x4", sash 4"x1-1/2"', Hardware: 'HAFELE or equal', Finish: 'Wood oil stain' };
+  for (const w of spec.walls) {
+    const tp = topOf(w), tf = tp.f, ridge = tp.ridge, zb = spec.wallBase, c = w.c;
+    const mat = { P2: 'wall_int', P3: 'wall_bath' }[w.mark] || 'wall_ext';
+    const ops = [];
+    for (const o of w.openings || []) {
+      if (o.void) { ops.push([o.a, o.b, o.zs, o.zh, null]); continue; }
+      const u = unitMap[o.unit];
+      let a = o.a, b = o.b;
+      if (o.c != null) { a = r4(o.c - u.w / 2); b = r4(o.c + u.w / 2); }
+      const floor = o.floor != null ? o.floor : FFL;
+      const zs = u.kind === 'door' ? FFL : floor + u.sill, zh = zs + u.h;
+      ops.push([a, b, zs, zh, Object.assign({ unitMark: o.unit, name: o.name || o.unit, ua: o.c != null ? o.c - u.w / 2 : a, ub: o.c != null ? o.c + u.w / 2 : b }, u)]);
+    }
+    ops.sort((p, q) => p[0] - q[0]);
+    const prism = (s0, s1, za, zf) => {
+      const prof = [[s0, za], [s1, za], [s1, zf(s1)]];
+      if (ridge != null && s0 + 1e-6 < ridge && ridge < s1 - 1e-6) prof.push([ridge, zf(ridge)]);
+      prof.push([s0, zf(s0)]);
+      const pts = prof.map(([s, z]) => (w.axis === 'x' ? [s, c - T / 2, z] : [c - T / 2, s, z]).map(r4));
+      return ['P', pts, w.axis === 'x' ? [0, 1, 0] : [1, 0, 0], T, mat];
+    };
+    const segArea = (s0, s1, za, zf) => {
+      const xs = [s0, s1]; if (ridge != null && s0 < ridge && ridge < s1) xs.push(ridge); xs.sort((p, q) => p - q);
+      let A = 0; for (let i = 0; i < xs.length - 1; i++) A += (xs[i + 1] - xs[i]) * ((zf(xs[i]) + zf(xs[i + 1])) / 2 - za); return A;
+    };
+    const parts = []; let cur = w.a, area = 0;
+    for (const [o0, o1, zs, zh] of ops) {
+      if (o0 > cur + 1e-6) { parts.push(prism(cur, o0, zb, tf)); area += segArea(cur, o0, zb, tf); }
+      if (zs > zb + 1e-3) { parts.push(prism(o0, o1, zb, () => zs)); area += (o1 - o0) * (zs - zb); }
+      parts.push(prism(o0, o1, zh, tf)); area += segArea(o0, o1, zh, tf);
+      cur = o1;
+    }
+    if (w.b > cur + 1e-6) { parts.push(prism(cur, w.b, zb, tf)); area += segArea(cur, w.b, zb, tf); }
+    const at = { Type: w.mark, Thickness_m: T, 'NetArea_m2(one face)': Math.round(area * 100) / 100, Spec: { P1: 'AAC Q-CON Extra Cool 7.5 cm, exterior paint', P2: 'AAC Q-CON Extra Cool 7.5 cm, interior paint', P3: 'Brick + plaster, glazed tile finish' }[w.mark] || w.mark };
+    if (w.note) at.Note = w.note;
+    add('IfcWall', w.id, w.mark, 'GF', 'A-Wall', parts, at);
+    // door / window units
+    for (const [, , zs, zh, u] of ops) {
+      if (!u) continue;
+      const a = u.ua, b = u.ub, f = 0.05, lt = 0.03, win = u.kind === 'window';
+      const box = (s0, s1, za, zz, d0, d1, m) => w.axis === 'x' ? ['B', s0, s1, c + d0, c + d1, za, zz, m] : ['B', c + d0, c + d1, s0, s1, za, zz, m];
+      const P = [box(a, a + f, zs, zh, -T / 2, T / 2, 'wood'), box(b - f, b, zs, zh, -T / 2, T / 2, 'wood'), box(a + f, b - f, zh - f, zh, -T / 2, T / 2, 'wood')];
+      const zlo = zs + (win ? f : 0);
+      if (win) P.push(box(a + f, b - f, zs, zs + f, -T / 2, T / 2, 'wood'));
+      const n = u.leaves, lw = (b - a - 2 * f) / n, leaf = win ? 'glass' : u.leaf;
+      for (let i = 0; i < n; i++) {
+        const s0 = a + f + i * lw, s1 = a + f + (i + 1) * lw;
+        if (i > 0) P.push(box(s0, s0 + 0.03, zlo, zh - f, -lt / 2 - 0.005, lt / 2 + 0.005, 'wood'));
+        P.push(box(s0 + (i > 0 ? 0.03 : 0), s1, zlo, zh - f, -lt / 2, lt / 2, leaf));
+      }
+      const at2 = Object.assign({ 'Size_WxH_m': `${(b - a).toFixed(2)}x${(zh - zs).toFixed(2)}`, Leaves: n }, DOORSPEC, { Description: u.desc, Group: u.group });
+      if (win) { at2.Glazing = 'Glass 6 mm + Lamina green-clear film'; at2.SillFromFloor_m = u.sill; }
+      add(win ? 'IfcWindow' : 'IfcDoor', u.name, u.unitMark, 'GF', win ? 'A-Window' : 'A-Door', P, at2);
+    }
+  }
+  // breeze-block screens
+  for (const s of spec.screens || []) {
+    const P = [], t = 0.09, web = 0.02, y = s.y, x0 = s.x0, x1 = s.x1, zb = s.zb, zt = s.zt;
+    P.push(['B', x0, x1, y - t / 2, y + t / 2, zb, zb + web, 'breeze'], ['B', x0, x1, y - t / 2, y + t / 2, zt - web, zt, 'breeze']);
+    const n = Math.max(1, Math.round((x1 - x0) / 0.19)), dx = (x1 - x0) / n;
+    for (let i = 0; i <= n; i++) { const x = x0 + i * dx; P.push(['B', r4(Math.max(x0, x - web / 2)), r4(Math.min(x1, x + web / 2)), y - t / 2, y + t / 2, zb + web, zt - web, 'breeze']); }
+    const m = Math.max(1, Math.round((zt - zb) / 0.19)), dz = (zt - zb) / m;
+    for (let j = 1; j < m; j++) { const z = zb + j * dz; P.push(['B', x0 + web / 2, x1 - web / 2, y - t / 2, y + t / 2, r4(z - web / 2), r4(z + web / 2), 'breeze']); }
+    add('IfcWall', s.name, s.mark, 'GF', 'A-Screen', P, { Description: s.desc, Unit: 'Breeze block 19x19x9 cm', 'Size_m': `${(x1 - x0).toFixed(2)}x${(zt - zb).toFixed(2)}`, Area_m2: Math.round((x1 - x0) * (zt - zb) * 100) / 100 });
+  }
+  for (const lv of spec.louvres || []) {
+    const P = [];
+    for (let s = lv.a; s < lv.b; s += lv.pitch)
+      P.push(lv.axis === 'x' ? ['B', r4(s - lv.w / 2), r4(s + lv.w / 2), lv.c - lv.d / 2, lv.c + lv.d / 2, lv.zb, lv.zt, 'wood'] : ['B', lv.c - lv.d / 2, lv.c + lv.d / 2, r4(s - lv.w / 2), r4(s + lv.w / 2), lv.zb, lv.zt, 'wood']);
+    add('IfcBuildingElementProxy', lv.name, 'LOUVRE', 'GF', 'A-Screen', P, { Description: lv.desc });
+  }
+  const cover = (k, tag) => (row) => add('IfcCovering', row.name, row.mark, 'GF', tag, [['B', row.x0, row.x1, row.y0, row.y1, row.zb, row.zt, row.mat]],
+    Object.assign({ PredefinedType: k, Description: row.desc, Area_m2: Math.round((row.x1 - row.x0) * (row.y1 - row.y0) * 100) / 100 }, row.note ? { Note: row.note } : {}));
+  (spec.floors || []).forEach(cover('FLOORING', 'A-Floor'));
+  (spec.ceilings || []).forEach(cover('CEILING', 'A-Ceiling'));
+  // roof coverings
+  const plane = (name, mark, x0, x1, y0, y1, zf, mat, desc, t) => {
+    const pts = [[x0, y0, zf(x0)], [x1, y0, zf(x1)], [x1, y1, zf(x1)], [x0, y1, zf(x0)]].map(p => p.map(r4));
+    const dx = x1 - x0, dz = zf(x1) - zf(x0), Ln = Math.hypot(dx, dz);
+    add('IfcRoof', name, mark, 'ROOF', 'A-Roof', [['P', pts, [-dz / Ln, 0, dx / Ln].map(v => Math.round(v * 1e5) / 1e5), t, mat]], { Description: desc, SlopeArea_m2: Math.round(Ln * (y1 - y0) * 100) / 100 });
+  };
+  for (const gb of gables) {
+    plane(`${gb.sheetName}-west`, gb.cover, gb.xL, gb.ridgeX, gb.y0, gb.y1, gb.z, 'roof', gb.coverDesc, 0.02);
+    plane(`${gb.sheetName}-east`, gb.cover, gb.ridgeX, gb.xR, gb.y0, gb.y1, gb.z, 'roof', gb.coverDesc, 0.02);
+  }
+  if (D) { const zd = deckFn(D); for (const [nm, x0, x1, y0, y1] of D.sheets) plane(nm, 'R2', x0, x1, y0, y1, zd, 'roof_clear', D.coverDesc, 0.01); }
+  if (spec.ridgeCaps) for (const gb of gables)
+    add('IfcRoof', `RIDGE-${gb.tag}`, gb.cover, 'ROOF', 'A-Roof', [['B', gb.ridgeX - 0.15, gb.ridgeX + 0.15, gb.y0, gb.y1, gb.z(gb.ridgeX) + 0.02, gb.z(gb.ridgeX) + 0.07, 'roof']], { Description: 'Ridge cap' });
+  // MEP
+  const M = spec.mep || {};
+  for (const f of M.fixtures || []) add(f.ifc, f.name, f.mark, 'GF', 'P-Sanitary', [['B', ...f.box, f.mat]], { Description: f.desc });
+  for (const p of M.pipes || []) add('IfcFlowSegment', p.name, 'DRAIN', 'FND', 'P-Drainage', [['R', p.p1, p.p2, p.dia, p.dia, 'pipe']],
+    { Description: `Drain pipe dia ${Math.round(p.dia * 1000)} mm, slope 1:200 (modelled square)`, Length_m: Math.round(Math.hypot(p.p2[0] - p.p1[0], p.p2[1] - p.p1[1], p.p2[2] - p.p1[2]) * 100) / 100 });
+  for (const f of M.chambers || []) add(f.ifc, f.name, f.mark, 'FND', 'P-Drainage', [['B', ...f.box, f.mat]], { Description: f.desc });
+  if (M.tank) {
+    const t = M.tank, pts = [];
+    for (let k = 0; k < t.sides; k++) pts.push([r4(t.x + t.r * Math.cos(k * 2 * Math.PI / t.sides)), r4(t.y + t.r * Math.sin(k * 2 * Math.PI / t.sides)), t.z0]);
+    add('IfcFlowStorageDevice', t.name, 'SAT', 'FND', 'P-Drainage', [['P', pts, [0, 0, 1], t.h, 'pipe']], { Description: t.desc });
+  }
+  for (const f of M.electrical || []) add(f.ifc, f.name, f.mark, 'GF', 'E-Electrical', [['B', ...f.box, f.mat]], { Description: f.desc });
+  if (spec.site) add('IfcBuildingElementProxy', 'SITE-GROUND', 'SITE', 'FND', 'Site', [['B', spec.site.x0, spec.site.x1, spec.site.y0, spec.site.y1, -0.05, 0, 'ground']], { Description: 'Reference ground plane' });
+  return E;
+}
+
+// ------------------------------------------------------------------ geometry helpers
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], addv = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = a => { const l = Math.hypot(a[0], a[1], a[2]); return [a[0] / l, a[1] / l, a[2] / l]; };
+function barFrame(p) {
+  const a = p[1], c = p[2], u = norm(sub(c, a));
+  let side = cross(u, [0, 0, 1]); side = Math.hypot(...side) < 1e-6 ? [1, 0, 0] : norm(side);
+  let up = norm(cross(side, u)); if (up[2] < 0) up = mul(up, -1);
+  return { a, c, u, side, up, L: Math.hypot(...sub(c, a)) };
+}
+function partVerts(p) {
+  if (p[0] === 'B') { const [, x0, x1, y0, y1, z0, z1] = p; const V = []; for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [z0, z1]) V.push([x, y, z]); return V; }
+  if (p[0] === 'P') { const n = norm(p[2]); return p[1].concat(p[1].map(q => addv(q, mul(n, p[3])))); }
+  const f = barFrame(p), b = p[3], h = p[4], V = [];
+  for (const e of [f.a, f.c]) for (const sx of [-1, 1]) for (const sy of [-1, 1]) V.push(addv(addv(e, mul(f.side, sx * b / 2)), mul(f.up, sy * h / 2)));
+  return V;
+}
+function partBBox(p) { const V = partVerts(p); const lo = [0, 1, 2].map(i => Math.min(...V.map(v => v[i]))), hi = [0, 1, 2].map(i => Math.max(...V.map(v => v[i]))); return [lo, hi]; }
+function polyArea(P, n) { let s = [0, 0, 0]; for (let i = 0; i < P.length; i++) s = addv(s, cross(P[i], P[(i + 1) % P.length])); return Math.abs(dot(s, norm(n))) / 2; }
+function partVolume(p) {
+  if (p[0] === 'B') return (p[2] - p[1]) * (p[4] - p[3]) * (p[6] - p[5]);
+  if (p[0] === 'P') return polyArea(p[1], p[2]) * p[3];
+  return Math.hypot(...sub(p[2], p[1])) * p[3] * p[4];
+}
+function elemBBox(e) { let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9]; for (const p of e.parts) { const [a, b] = partBBox(p); lo = lo.map((v, i) => Math.min(v, a[i])); hi = hi.map((v, i) => Math.max(v, b[i])); } return [lo, hi]; }
+
+// strict containment with tolerance
+function contains(p, q, tol = 0.003) {
+  if (p[0] === 'B') { const [, x0, x1, y0, y1, z0, z1] = p; return x0 + tol < q[0] && q[0] < x1 - tol && y0 + tol < q[1] && q[1] < y1 - tol && z0 + tol < q[2] && q[2] < z1 - tol; }
+  if (p[0] === 'R') { const f = barFrame(p), d = sub(q, f.a), t = dot(d, f.u); return tol < t && t < f.L - tol && Math.abs(dot(d, f.side)) < p[3] / 2 - tol && Math.abs(dot(d, f.up)) < p[4] / 2 - tol; }
+  const P = p[1], n = norm(p[2]), s = dot(sub(q, P[0]), n);
+  if (!(tol < s && s < p[3] - tol)) return false;
+  const qq = sub(q, mul(n, s)), ax = [0, 1, 2].reduce((m, i) => Math.abs(n[i]) > Math.abs(n[m]) ? i : m, 0), ids = [0, 1, 2].filter(i => i !== ax);
+  let sgn = 0;
+  for (let i = 0; i < P.length; i++) {
+    const A = [P[i][ids[0]], P[i][ids[1]]], B = [P[(i + 1) % P.length][ids[0]], P[(i + 1) % P.length][ids[1]]];
+    const e = [B[0] - A[0], B[1] - A[1]], le = Math.hypot(e[0], e[1]); if (le < 1e-9) continue;
+    const cr = (e[0] * (qq[ids[1]] - A[1]) - e[1] * (qq[ids[0]] - A[0])) / le;
+    if (Math.abs(cr) < tol) return false;
+    if (sgn === 0) sgn = Math.sign(cr); else if (Math.sign(cr) !== sgn) return false;
+  }
+  return true;
+}
+function linspace(a, b, n) { const o = []; for (let i = 0; i < n; i++) o.push(n === 1 ? a : a + (b - a) * i / (n - 1)); return o; }
+function samples(p, n = 4) {
+  if (p[0] === 'B') { const [, x0, x1, y0, y1, z0, z1] = p, gg = (a, b) => linspace(a + (b - a) * 0.02, b - (b - a) * 0.02, n), o = []; for (const x of gg(x0, x1)) for (const y of gg(y0, y1)) for (const z of gg(z0, z1)) o.push([x, y, z]); return o; }
+  if (p[0] === 'R') {
+    const V = partVerts(p), ca = V.slice(0, 4).reduce(addv).map(v => v / 4), cc = V.slice(4).reduce(addv).map(v => v / 4), o = [];
+    for (const t of linspace(0.02, 0.98, 3 * n)) { const e = addv(ca, mul(sub(cc, ca), t)); for (let k = 0; k < 4; k++) o.push(addv(e, mul(sub(V[k], ca), 0.9))); o.push(e); }
+    return o;
+  }
+  const P = p[1], nn = norm(p[2]), cen = P.reduce(addv).map(v => v / P.length), o = [];
+  for (const s of linspace(0.1, 0.9, 3)) { for (const v of P) for (const f of [0.2, 0.6, 0.95]) o.push(addv(addv(cen, mul(sub(v, cen), f)), mul(nn, p[3] * s))); o.push(addv(cen, mul(nn, p[3] * s))); }
+  return o;
+}
+function clashes(E) {
+  const P = [];
+  E.forEach((e, ei) => e.parts.forEach(p => { const [lo, hi] = partBBox(p); P.push([ei, p, lo, hi]); }));
+  const expected = (a, b) => {
+    const A = E[a], B = E[b], s = new Set([A.ifc, B.ifc]);
+    if (A.name === 'SITE-GROUND' || B.name === 'SITE-GROUND' || A.tag === 'Site' || B.tag === 'Site') return true;
+    if ((A.attrs && A.attrs.ClashExempt) || (B.attrs && B.attrs.ClashExempt)) return true;
+    if ([...s].every(x => ['IfcFlowSegment', 'IfcDistributionChamberElement', 'IfcFlowStorageDevice'].includes(x))) return true;
+    if (A.tag.startsWith('S-') && B.tag.startsWith('S-')) return true;
+    return false;
+  };
+  const hits = new Map();
+  for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+    const [ei, pi, loi, hii] = P[i], [ej, pj, loj, hij] = P[j];
+    if (ei === ej) continue;
+    if ([0, 1, 2].some(k => Math.min(hii[k], hij[k]) - Math.max(loi[k], loj[k]) <= 0.003)) continue;
+    if (expected(ei, ej)) continue;
+    let n = 0; for (const q of samples(pi)) if (contains(pj, q)) n++; for (const q of samples(pj)) if (contains(pi, q)) n++;
+    if (n) { const k = ei + '|' + ej; hits.set(k, (hits.get(k) || 0) + n); }
+  }
+  return [...hits.entries()].map(([k, n]) => { const [a, b] = k.split('|').map(Number); return { a: E[a].name, b: E[b].name, ia: a, ib: b, n }; }).sort((x, y) => y.n - x.n);
+}
+
+// ------------------------------------------------------------------ takeoff
+function takeoff(spec, E) {
+  const Q = {}, add = (k, v, basis) => { const d = spec.takeoffDesc[k] || [k, '', '']; Q[k] = { key: k, desc: d[0], unit: d[1], qty: Math.round(v * 1000) / 1000, basis: basis || d[2] }; };
+  const byIfc = t => E.filter(e => e.ifc === t), B = e => e.parts[0];
+  const dims = e => { const p = B(e); return [p[2] - p[1], p[4] - p[3], p[6] - p[5]]; }, vol = e => { const d = dims(e); return d[0] * d[1] * d[2]; };
+  const L = spec.levels, F = spec.foundation, C = spec.columns, R = spec.rates;
+  const foot = byIfc('IfcFooting'), piles = byIfc('IfcPile');
+  const colL = E.filter(e => e.name.startsWith('C1L')), colU = E.filter(e => e.name.startsWith('C1U'));
+  const n = foot.length, fbw = F.footing.b, fh = F.footing.h, pad = F.exc.padSize;
+  const depth = -L.footingTop + fh + F.exc.sand + F.exc.lean;
+  add('pile', piles.length); add('cutpile', piles.length);
+  const exc = n * (fbw + 2 * F.exc.margin) ** 2 * depth; add('exc', exc);
+  const sand = n * pad * pad * F.exc.sand, lean = n * pad * pad * F.exc.lean; add('sand', sand); add('lean', lean);
+  const vf = foot.reduce((s, e) => s + vol(e), 0), below = colL.length * C.lower.size ** 2 * (-L.footingTop);
+  add('bf', exc - vf - below - sand - lean);
+  add('c_ft', vf); add('f_ft', n * 4 * fbw * fh);
+  add('db_ft', n * F.footing.barsDB16 * F.footing.barLen * KG.DB16); add('rb_ft', n * F.footing.ringRB9 * 4 * (fbw - 0.08) * KG.RB9);
+  const colQ = (cols, cfg, pre) => {
+    add('c_' + pre, cols.reduce((s, e) => s + vol(e), 0));
+    add('f_' + pre, cols.reduce((s, e) => s + 4 * cfg.size * dims(e)[2], 0));
+    add('db_' + pre, cols.reduce((s, e) => s + cfg.bars * (dims(e)[2] + cfg.extra) * KG[cfg.bar], 0));
+    add('rb_' + pre, cols.reduce((s, e) => s + (dims(e)[2] / 0.15 + 1) * cfg.tie * KG.RB9, 0));
+  };
+  colQ(colL, C.lower, 'cl'); colQ(colU, C.upper, 'cu');
+  let vb = 0, fb = 0, stir = 0; const bars = {};
+  for (const e of byIfc('IfcBeam').filter(e => e.level !== 'ROOF')) {
+    const [dx, dy, d] = dims(e), Lb = Math.max(dx, dy), b = Math.min(dx, dy);
+    vb += b * d * Lb; fb += (b + 2 * d) * Lb;
+    for (const [sz, k] of Object.entries(spec.beamEqBars[e.mark] || {})) bars[sz] = (bars[sz] || 0) + k * Lb * R.lapFactor * KG[sz];
+    stir += (Lb / 0.15 + 1) * (2 * (b + d) - 0.24 + 0.20) * KG.RB9;
+  }
+  add('c_bm', vb); add('f_bm', fb); add('db_bm12', bars.DB12 || 0); add('db_bm16', bars.DB16 || 0); if (bars.DB20) add('db_bm20', bars.DB20); add('rb_bm', stir);
+  const slabs = byIfc('IfcSlab').filter(e => e.tag === 'S-Slab'), PS = slabs.filter(e => e.mark === 'PS'), S1 = slabs.filter(e => e.mark === 'S1');
+  const aPS = PS.reduce((s, e) => s + dims(e)[0] * dims(e)[1], 0), aS1 = S1.reduce((s, e) => s + dims(e)[0] * dims(e)[1], 0);
+  add('ps', aPS); add('c_top', aPS * 0.05); add('rb_top', aPS * R.topMeshKgm2);
+  add('c_s1', S1.reduce((s, e) => s + vol(e), 0)); add('f_s1', aS1); add('rb_s1', aS1 * R.slabS1_kgm2);
+  const st = byIfc('IfcStair'), vst = st.reduce((s, e) => s + vol(e), 0), W = spec.stairs.reduce((s, x) => s + (x.x1 - x.x0), 0);
+  const nst = spec.stairLevels.length, run = nst * spec.stairTread, rise = spec.stairLevels[0] + 0.15, soff = Math.round(Math.hypot(run, rise) * 100) / 100;
+  add('c_st', vst); add('f_st', soff * W + nst * 0.15 * W + 2.0); add('rb_st', vst * R.stair_kgm3);
+  const Ls = {}; for (const e of E) if (e.parts[0][0] === 'R' && e.level === 'ROOF') Ls[e.mark] = (Ls[e.mark] || 0) + Math.hypot(...sub(e.parts[0][2], e.parts[0][1]));
+  const kg = (...m) => m.reduce((s, k) => s + (Ls[k] || 0) * R.kgm[k], 0), tot = Object.keys(R.kgm).reduce((s, k) => s + kg(k), 0);
+  add('st_150', kg('PRIMARY', 'RIDGE', 'EAVE')); add('st_100', kg('RAFTER', 'DECK-RAFTER')); add('st_50', kg('PURLIN')); add('st_i', kg('DECK-I', 'DECK-I-NS'));
+  add('st_conn', tot * R.steelConn); add('st_paint', tot * (1 + R.steelConn));
+  const wa = mk => E.filter(e => e.ifc === 'IfcWall' && e.mark === mk).reduce((s, e) => s + (e.attrs['NetArea_m2(one face)'] || 0), 0);
+  const P1 = wa('P1'), P2 = wa('P2'), P3 = wa('P3');
+  add('w_aac', P1 + P2); add('w_brick', P3); add('w_tie', P1 + P2 + P3); add('plaster', 2 * (P1 + P2 + P3));
+  const bt = R.bathTile, tWall = bt.rooms * (2 * (bt.w + bt.d) * bt.h - bt.minus); add('t_wall', tWall);
+  const bz = (spec.screens || []).reduce((s, x) => s + (x.x1 - x.x0) * (x.zt - x.zb), 0); add('breeze', bz); add('paint_bz', bz * 2 * R.breezePaintFactor);
+  const cov = mk => E.filter(e => e.ifc === 'IfcCovering' && e.mark === mk).reduce((s, e) => s + e.attrs.Area_m2, 0);
+  add('f2', cov('F2')); add('f3', cov('F3')); add('wp', cov('F3') + bt.rooms * 2 * (bt.w + bt.d) * 0.30); add('f4', cov('F4'));
+  add('c1', cov('C1')); add('c2', cov('C2'));
+  const ra = mk => E.filter(e => e.ifc === 'IfcRoof' && e.mark === mk && e.attrs.SlopeArea_m2).reduce((s, e) => s + e.attrs.SlopeArea_m2, 0);
+  add('r1', ra('R1')); add('r2', ra('R2'));
+  add('paint_ext', P1); add('paint_int', P1 + 2 * P2 + 2 * P3 - tWall); add('paint_ceil', cov('C1') + cov('C2'));
+  const pipes = E.filter(e => e.ifc === 'IfcFlowSegment' && e.parts[0][3] >= 0.15), p8 = pipes.reduce((s, e) => s + e.attrs.Length_m, 0);
+  add('p8', p8); add('p_exc', p8 * R.drainTrench[0] * R.drainTrench[1]); add('mh', E.filter(e => e.mark === 'MH').length);
+  for (const [k, m] of Object.entries(spec.manualQty || {})) Q[k] = { key: k, desc: m.desc, unit: m.unit, qty: m.qty, basis: m.basis, manual: true };
+  // openings
+  const op = {};
+  for (const e of E) if (e.ifc === 'IfcDoor' || e.ifc === 'IfcWindow') {
+    const [w, h] = e.attrs['Size_WxH_m'].split('x').map(Number);
+    const o = op[e.mark] || (op[e.mark] = { mark: e.mark, count: 0, area: w * h, size: e.attrs['Size_WxH_m'], leaves: e.attrs.Leaves, desc: e.attrs.Description, group: e.attrs.Group });
+    o.count++;
+  }
+  return { Q, openings: Object.values(op).sort((a, b) => a.mark < b.mark ? -1 : 1), wallArea: { P1, P2, P3 } };
+}
+
+// ------------------------------------------------------------------ BOQ
+function factorF(tbl, v) {
+  let i = -1; for (let k = 0; k < tbl.length; k++) if (tbl[k][0] <= v) i = k;
+  if (i < 0) return tbl[0][1];
+  if (i >= tbl.length - 1) return tbl[tbl.length - 1][1];
+  const [a0, f0] = tbl[i], [a1, f1] = tbl[i + 1];
+  return f0 + (v - a0) * (f1 - f0) / (a1 - a0);
+}
+function boq(spec, TO) {
+  const rows = [], cats = [];
+  const openArea = grp => TO.openings.filter(o => o.group === grp).reduce((s, o) => s + o.count * o.area, 0);
+  for (const cat of spec.boq) {
+    const c = { code: cat.code, title: cat.title, subs: [], mat: 0, lab: 0, total: 0 };
+    for (const s of cat.subs) {
+      const sb = { title: s.title, rows: [], mat: 0, lab: 0, total: 0 };
+      s.items.forEach((it, k) => {
+        let base, desc = it.desc, unit = it.unit, note = it.note || '';
+        if (typeof it.qty === 'number') base = it.qty;
+        else if (typeof it.qty === 'string' && it.qty.startsWith('open:')) base = openArea(it.qty.slice(5));
+        else { const t = TO.Q[it.key]; base = t ? t.qty : 0; desc = desc || (t ? t.desc : it.key); unit = unit || (t ? t.unit : ''); note = note || (t ? 'Takeoff: ' + t.basis : 'ไม่พบปริมาณ'); }
+        const q = base * (1 + it.waste / 100), mat = q * it.mat, lab = q * it.lab;
+        const r = { no: s.title.split(' ')[0] + '.' + (k + 1), key: it.key, desc, unit, base, waste: it.waste, qty: q, rMat: it.mat, rLab: it.lab, mat, lab, total: mat + lab, act: it.act, cat: cat.code, note, ref: it };
+        sb.rows.push(r); rows.push(r); sb.mat += mat; sb.lab += lab; sb.total += mat + lab;
+      });
+      c.subs.push(sb); c.mat += sb.mat; c.lab += sb.lab; c.total += sb.total;
+    }
+    cats.push(c);
+  }
+  const direct = cats.reduce((s, c) => s + c.total, 0);
+  const F = spec.plan.useFactorF ? factorF(spec.plan.factorF, direct) : 1;
+  return { rows, cats, direct, mat: cats.reduce((s, c) => s + c.mat, 0), lab: cats.reduce((s, c) => s + c.lab, 0), F, total: direct * F };
+}
+
+// ------------------------------------------------------------------ schedule (Excel WORKDAY.INTL semantics, Sunday off)
+const D0 = s => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d) / 864e5; };
+const iso = n => new Date(n * 864e5).toISOString().slice(0, 10);
+function schedule(spec, BQ, TO) {
+  const H = new Set(spec.plan.holidays.filter(Boolean).map(D0));
+  const wd = d => new Date(d * 864e5).getUTCDay() !== 0 && !H.has(d);
+  const shift = (d, n) => { const s = n > 0 ? 1 : -1; while (n !== 0) { d += s; if (wd(d)) n -= s; } return d; };
+  const nwd = (a, b) => { let n = 0; for (let d = a; d <= b; d++) if (wd(d)) n++; return n; };
+  const start = D0(spec.plan.start);
+  const qtyOf = k => BQ.rows.filter(r => r.key === k).reduce((s, r) => s + r.qty, 0);
+  const openTot = TO.openings.reduce((s, o) => s + o.count * o.area, 0);
+  const A = {}, list = [];
+  for (const a of spec.activities) {
+    const qty = a.drivers.length ? a.drivers.reduce((s, k) => s + (k === 'OPEN' ? openTot : qtyOf(k)), 0) : null;
+    const base = a.fixed != null ? a.fixed : Math.max(1, ceilx(qty / (a.prod * a.crews)));
+    let st = start;
+    for (const [p, l] of a.preds) { if (!A[p]) throw new Error(`กิจกรรม ${a.id}: ไม่พบกิจกรรมก่อนหน้า ${p} (ต้องอยู่ก่อนในรายการ)`); st = Math.max(st, shift(A[p].fin, l + 1)); }
+    const month = new Date(st * 864e5).getUTCMonth(), w = spec.plan.weather[month];
+    const dur = ceilx(base / (1 - w)), fin = shift(st, dur - 1);
+    const cost = BQ.rows.filter(r => r.act === a.id);
+    const byCat = {}; for (const r of cost) byCat[r.cat] = (byCat[r.cat] || 0) + r.total * BQ.F;
+    const o = { id: a.id, name: a.name, qty, base, weather: w, dur, st, fin, wd: nwd(st, fin), direct: cost.reduce((s, r) => s + r.total, 0), byCat, preds: a.preds, ref: a };
+    o.value = o.direct * BQ.F; A[a.id] = o; list.push(o);
+  }
+  const end = Math.max(...list.map(a => a.fin)), succ = {}; list.forEach(a => succ[a.id] = []);
+  list.forEach(a => a.preds.forEach(([p, l]) => succ[p].push([a.id, l])));
+  const LS = {}, LF = {};
+  for (const a of [...list].sort((x, y) => y.fin - x.fin)) {
+    let lf = end; for (const [s, l] of succ[a.id]) lf = Math.min(lf, shift(LS[s], -(l + 1)));
+    LF[a.id] = lf; LS[a.id] = shift(lf, -(a.dur - 1));
+    a.float = lf >= a.fin ? nwd(a.fin, lf) - 1 : -(nwd(lf, a.fin) - 1); a.critical = a.float <= 0;
+  }
+  const weeks = ceilx((end - start + 1) / 7), cats = spec.boq.map(c => c.code), W = [];
+  let cum = 0; const cumCat = {}; cats.forEach(c => cumCat[c] = 0);
+  for (let k = 0; k < weeks; k++) {
+    const ws = start + 7 * k, we = ws + 6, row = { week: k + 1, ws: iso(ws), we: iso(we), value: 0, byCat: {}, frac: {} };
+    cats.forEach(c => row.byCat[c] = 0);
+    for (const a of list) {
+      const s = Math.max(a.st, ws), e = Math.min(a.fin, we);
+      const f = e < s ? 0 : nwd(s, e) / a.wd; row.frac[a.id] = f;
+      row.value += f * a.value; cats.forEach(c => row.byCat[c] += f * (a.byCat[c] || 0));
+    }
+    cum += row.value; row.cum = cum; cats.forEach(c => { cumCat[c] += row.byCat[c]; });
+    row.cumCat = Object.assign({}, cumCat);
+    W.push(row);
+  }
+  const total = BQ.total;
+  W.forEach(r => { r.pct = r.cum / total; r.wpct = r.value / total; });
+  const catTot = {}; cats.forEach(c => catTot[c] = W.reduce((s, r) => s + r.byCat[c], 0));
+  W.forEach(r => { r.cumCatPct = {}; cats.forEach(c => r.cumCatPct[c] = catTot[c] ? r.cumCat[c] / catTot[c] : 0); });
+  list.forEach(a => { a.stISO = iso(a.st); a.finISO = iso(a.fin); });
+  return { acts: list, start: iso(start), end: iso(end), days: end - start + 1, workdays: nwd(start, end), weeks, W, catTot };
+}
+
+// ------------------------------------------------------------------ full run
+const TYPES = { house: { generate, takeoff } };
+function register(name, impl) { TYPES[name] = impl; }
+function run(spec) {
+  const t0 = Date.now(), T = TYPES[spec.type || 'house'];
+  if (!T) throw new Error('ไม่รู้จักชนิดโครงการ: ' + spec.type);
+  const E = T.generate(spec), TO = T.takeoff(spec, E); TO.openings = TO.openings || [];
+  const BQ = boq(spec, TO), SC = schedule(spec, BQ, TO);
+  return { E, TO, BQ, SC, ms: Date.now() - t0 };
+}
+
+// ------------------------------------------------------------------ SketchUp Ruby export
+function rb(v) {
+  if (v === null || v === undefined) return 'nil';
+  if (Array.isArray(v)) return '[' + v.map(rb).join(',') + ']';
+  if (typeof v === 'object') return '{' + Object.entries(v).map(([k, x]) => JSON.stringify(String(k)) + '=>' + rb(x)).join(', ') + '}';
+  if (typeof v === 'string') return JSON.stringify(v);
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  if (Number.isInteger(v)) return String(v);
+  const s = String(Math.round(v * 1e5) / 1e5); return s.includes('.') || s.includes('e') ? s : s + '.0';
+}
+function rubyScript(spec, E, template) {
+  const part = p => '[' + { B: ':box', P: ':poly', R: ':bar' }[p[0]] + ',' + p.slice(1).map(rb).join(',') + ']';
+  const rows = E.map(e => '    [' + [rb(e.ifc), rb(e.name), rb(e.mark), rb(e.level), rb(e.tag), '[' + e.parts.map(part).join(',') + ']', rb(e.attrs)].join(',') + '],');
+  const ns = E.filter(e => /^[SC]-/.test(e.tag)).length, rx = spec.ruby || {};
+  let t = template;
+  if (rx.header) t = t.replace(/# =+\n[\s\S]*?# =+\n/, '# ' + '='.repeat(77) + '\n' + rx.header.split('\n').map(l => '#  ' + l).join('\n') + '\n# ' + '='.repeat(77) + '\n');
+  if (rx.storeys) t = t.replace(/  STOREYS = \{[^\n]*\}/, '  STOREYS = ' + rb(rx.storeys));
+  if (rx.module) t = t.replace(/Type03BIM/g, rx.module);
+  t = t.replace('#DATA#', rows.join('\n')).replace('#COUNT_S#', String(ns)).replace('#COUNT#', String(E.length)).replace(/TYPE03 House BIM/g, (spec.name || 'House') + ' BIM');
+  if (rx.module) t = t.replace(/TYPE03 BIM/g, (spec.name || 'Model') + ' BIM');
+  return t;
+}
+
+const API = { register, TYPES, generate, takeoff, boq, schedule, run, clashes, partVerts, partBBox, partVolume, elemBBox, rubyScript, factorF, gableFn, deckFn, contains, samples, polyArea };
+if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.HouseEngine = API;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* Box culvert under an irrigation canal — RID standard มฐ04-62 (ท่อลอดคลองส่งน้ำ ค.ส.ล. แบบหล่อในที่).
+   spec (type 'culvert') -> elements (same part format as the house engine) -> takeoff. BOQ/schedule are the shared engine.
+   Axes: x = flow direction (upstream negative, x = 0 on canal centreline), y = across the culvert (along the canal),
+   z = elevation − datum (datum = original ground level). Units: metres. */
+(function (root) {
+'use strict';
+const H = (typeof module !== 'undefined' && module.exports) ? require('./engine.js') : root.HouseEngine;
+const r4 = v => Math.round(v * 1e4) / 1e4;
+const KGM = { 10: 0.617, 12: 0.888, 16: 1.578, 20: 2.466 };
+
+// ---------------------------------------------------------------- standard tables (มฐ04-62, verified from the drawing set)
+const STD = {
+  '1.80': { H: 1.80, L: 1.80, HT: 2.80, LT: 4.20, LU: 8, LD: 8, BT: [4.5, 6.5], bu: [5, 7], t1: 0.25, t2: 0.20, e: 0.90, Q: [9.5, 19] },
+  '2.10': { H: 2.10, L: 2.10, HT: 3.20, LT: 4.80, LU: 9, LD: 9, BT: [5.0, 7.5], bu: [5.5, 8], t1: 0.30, t2: 0.30, e: 1.00, Q: [13, 26] },
+  '2.40': { H: 2.40, L: 2.40, HT: 3.50, LT: 5.25, LU: 10, LD: 10, BT: [5.6, 8.4], bu: [6, 9], t1: 0.40, t2: 0.40, e: 1.50, Q: [17, 34] },
+};
+// [hc_min, hc_max, Ts, Tw, bar1, bar2, bar3, bar4, bar5 (straight joint), bar6 (double: middle wall)]
+const BARS = {
+  1: {
+    '1.80': [[0.60, 1.50, .25, .20, '12H@0.20', '12H@0.20', '12Ø@0.15', '10Ø@0.20', '10Ø@0.20'], [1.51, 3.00, .25, .20, '12H@0.20', '12H@0.20', '12Ø@0.10', '10Ø@0.20', '10Ø@0.20'],
+             [3.01, 3.90, .30, .25, '12H@0.20', '12H@0.20', '12Ø@0.10', '10Ø@0.20', '10Ø@0.20'], [3.91, 5.00, .30, .25, '12H@0.20', '12H@0.20', '12Ø@0.10', '10Ø@0.20', '10Ø@0.20']],
+    '2.10': [[0.60, 1.50, .25, .20, '12H@0.20', '12H@0.20', '12Ø@0.10', '10Ø@0.20', '10Ø@0.20'], [1.51, 3.00, .30, .25, '12H@0.20', '12H@0.20', '12Ø@0.10', '10Ø@0.20', '10Ø@0.20'],
+             [3.01, 3.90, .35, .30, '12H@0.20', '12H@0.20', '12Ø@0.10', '12Ø@0.20', '12Ø@0.20'], [3.91, 5.00, .40, .35, '12H@0.20', '12H@0.20', '12Ø@0.10', '12Ø@0.20', '12Ø@0.20']],
+    '2.40': [[0.60, 1.50, .25, .25, '12H@0.20', '12H@0.20', '16Ø@0.15', '10Ø@0.20', '10Ø@0.20'], [1.51, 3.00, .35, .25, '16H@0.20', '16H@0.20', '16Ø@0.15', '12Ø@0.20', '12Ø@0.20'],
+             [3.01, 3.90, .40, .30, '16H@0.20', '16H@0.20', '16Ø@0.15', '12Ø@0.20', '12Ø@0.20'], [3.91, 5.00, .45, .35, '16H@0.20', '16H@0.20', '16Ø@0.15', '12Ø@0.20', '12Ø@0.20']],
+  },
+  2: {
+    '1.80': [[0.60, 1.50, .20, .20, '12H@0.20', '12H@0.20', '12Ø@0.10', '10H@0.20', '10Ø@0.20', '10Ø@0.20'], [1.51, 3.00, .25, .20, '12H@0.20', '16H@0.20', '12Ø@0.10', '12H@0.20', '10Ø@0.20', '10Ø@0.20'],
+             [3.01, 3.90, .30, .25, '12H@0.20', '16H@0.20', '16Ø@0.10', '12H@0.20', '10Ø@0.20', '10Ø@0.20'], [3.91, 5.00, .35, .30, '12H@0.20', '16H@0.20', '16Ø@0.10', '12H@0.20', '10Ø@0.20', '10Ø@0.20']],
+    '2.10': [[0.60, 1.50, .25, .20, '12H@0.20', '16H@0.20', '12Ø@0.10', '10H@0.20', '10Ø@0.20', '10Ø@0.20'], [1.51, 3.00, .30, .25, '12H@0.20', '16H@0.20', '12Ø@0.10', '12H@0.20', '12Ø@0.20', '12Ø@0.20'],
+             [3.01, 3.90, .35, .30, '12H@0.20', '16H@0.10', '16Ø@0.10', '12H@0.20', '12Ø@0.20', '12Ø@0.20'], [3.91, 5.00, .40, .35, '12H@0.20', '16H@0.10', '16Ø@0.10', '12H@0.20', '12Ø@0.20', '12Ø@0.20']],
+    '2.40': [[0.60, 1.50, .25, .25, '12H@0.20', '16H@0.10', '16Ø@0.10', '10H@0.20', '10Ø@0.20', '10Ø@0.20'], [1.51, 3.00, .35, .25, '12H@0.20', '16H@0.10', '16Ø@0.10', '12H@0.20', '12Ø@0.20', '12Ø@0.20'],
+             [3.01, 3.90, .40, .30, '12H@0.20', '16H@0.10', '16Ø@0.10', '12H@0.20', '12Ø@0.20', '12Ø@0.20'], [3.91, 5.00, .45, .35, '12H@0.20', '16H@0.10', '16Ø@0.10', '12H@0.20', '12Ø@0.20', '12Ø@0.20']],
+  },
+};
+const bar = s => { const m = /^(\d+)\D+@([\d.]+)$/.exec(s); return { d: Number(m[1]), s: Number(m[2]), txt: s }; };
+
+// ---------------------------------------------------------------- derived design values (shared by generate + takeoff)
+function design(spec) {
+  const c = spec.culvert, n = Number(c.barrels), sz = STD[c.size];
+  if (!sz) throw new Error('ขนาดท่อต้องเป็น 1.80, 2.10 หรือ 2.40');
+  if (n !== 1 && n !== 2) throw new Error('จำนวนช่องต้องเป็น 1 หรือ 2');
+  const Lv = spec.levels, dat = Lv.ground, el = v => r4(v - dat), K = spec.canal, S = spec.site || {};
+  const g = 0, bed = el(K.bed), top = el(K.bankTop), hIn = top - bed;
+  const xCrest = K.b / 2 + K.z * hIn, xOut = xCrest + K.crest, xToe = xOut + K.outer * (top - g);
+  const slopeZ = x => { const a = Math.abs(x); return a <= xOut ? top : Math.max(g, top - (a - xOut) / K.outer); };
+  const inv5 = el(Lv.el5), inv6 = el(Lv.el6), HT = sz.HT;
+  // barrel length each side: headwall top (= invert + HT) stands 0.10 above the embankment slope (section ตามยาว), rounded up to 0.05
+  const auto = inv => Math.ceil((xOut + K.outer * (top - (inv + HT - 0.10)) - 0.20) / 0.05 - 1e-9) * 0.05;   // − headwall thickness
+  const Lup = r4(c.lengthUp === 'auto' || c.lengthUp == null ? auto(inv5) : Number(c.lengthUp));
+  const Ldn = r4(c.lengthDn === 'auto' || c.lengthDn == null ? auto(inv6) : Number(c.lengthDn));
+  const xa = -Lup, xb = Ldn, Lb = Lup + Ldn;
+  const inv = x => inv5 + (inv6 - inv5) * (x - xa) / Lb;
+  // cover over the top slab at the canal (bed − lining − top of slab), using the thinnest Ts first then re-check
+  const tbl = BARS[n][c.size];
+  const hc0 = bed - K.lining - (inv(0) + sz.H);                // cover to underside of lining measured from inside-top level
+  let row = tbl.find(r => hc0 - r[2] >= r[0] - 0.005 && hc0 - r[2] <= r[1] + 0.005) || (hc0 - tbl[0][2] < tbl[0][0] ? tbl[0] : tbl[tbl.length - 1]);
+  if (c.row != null && tbl[c.row]) row = tbl[c.row];
+  const Ts = row[2], Tw = row[3], hc = r4(hc0 - Ts);
+  const W = r4(n * sz.L + (n + 1) * Tw), Hout = r4(sz.H + 2 * Ts);
+  const nseg = Lb < 10 ? 1 : Lb <= 18 ? 2 : Math.ceil(Lb / 9 - 1e-9);
+  const BT = sz.BT[n - 1], bu = sz.bu[n - 1];
+  const ends = [
+    { key: 'U', name: 'ต้นน้ำ', sg: -1, xe: xa, inv: inv5, ch: el(Lv.el1), Lc: sz.LU, chName: 'EL.1' },
+    { key: 'D', name: 'ท้ายน้ำ', sg: 1, xe: xb, inv: inv6, ch: el(Lv.el3), Lc: sz.LD, chName: 'EL.3' },
+  ];
+  return { c, n, sz, dat, el, K, S, g, bed, top, xCrest, xOut, xToe, slopeZ, inv5, inv6, Lup, Ldn, xa, xb, Lb, inv, row, hc, Ts, Tw, W, Hout, nseg, BT, bu, ends,
+    ws: S.workSpace ?? 0.5, exs: S.excSlope ?? 1.0, lean: 0.05, rip: 0.30, grav: 0.15, hw: 0.20, key: [0.35, 0.25], toe: [0.30, 0.65], bars: row.slice(4).map(bar) };
+}
+
+// ---------------------------------------------------------------- generate
+function generate(spec) {
+  const D = design(spec), E = [];
+  const add = (ifc, name, mark, level, tag, parts, attrs) => E.push({ ifc, name, mark, level, tag, parts, attrs: attrs || {} });
+  const { n, sz, W, Ts, Tw, inv, BT, bu } = D;
+  // sloped slab/wall piece whose profile lies in the XZ plane between x0..x1 and is extruded along +y from y0 by t
+  const xz = (x0, x1, zb0, zb1, zt0, zt1, y0, t, mat) => ['P', [[x0, y0, zb0], [x1, y0, zb1], [x1, y0, zt1], [x0, y0, zt0]].map(p => p.map(r4)), [0, 1, 0], r4(t), mat];
+  const poly = (pts, y0, t, mat) => ['P', pts.map(([x, z]) => [r4(x), r4(y0), r4(z)]), [0, 1, 0], r4(t), mat];
+  const box = (x0, x1, y0, y1, z0, z1, mat) => ['B', r4(Math.min(x0, x1)), r4(Math.max(x0, x1)), r4(y0), r4(y1), r4(z0), r4(z1), mat];
+  const EL = z => Math.round((z + D.dat) * 1000) / 1000;
+  const sec = `${n}×${sz.L.toFixed(2)}×${sz.H.toFixed(2)} ม.`;
+
+  // barrel segments split at contraction joints
+  for (let i = 0; i < D.nseg; i++) {
+    const s0 = D.xa + D.Lb * i / D.nseg, s1 = D.xa + D.Lb * (i + 1) / D.nseg, i0 = inv(s0), i1 = inv(s1), len = s1 - s0, nm = `BARREL-S${i + 1}`;
+    const common = { Segment: i + 1, Length_m: r4(len), Section: sec, 'Invert_EL(start/end)': `${EL(i0).toFixed(3)} / ${EL(i1).toFixed(3)}`, Ts_m: Ts, Tw_m: Tw, 'Cover_hc_m': D.hc };
+    add('IfcSlab', nm + '-BASE', 'BX-BASE', 'STR', 'C-Barrel', [xz(s0, s1, i0 - Ts, i1 - Ts, i0, i1, -W / 2, W, 'concrete')],
+      Object.assign({ Group: 'b1', Form_m2: r4(2 * len * Ts), Bars: `② ${D.bars[1].txt} ; ③ ${D.bars[2].txt} ; ⑤ ${D.bars[4].txt}` }, common, rebarBarrel(D, len, 'b1')));
+    const walls = []; for (let k = 0; k <= n; k++) walls.push(xz(s0, s1, i0, i1, i0 + sz.H, i1 + sz.H, -W / 2 + k * (sz.L + Tw), Tw, 'concrete'));
+    add('IfcWall', nm + '-WALLS', 'BX-WALL', 'STR', 'C-Barrel', walls,
+      Object.assign({ Group: 'b2', Form_m2: r4((n + 1) * 2 * sz.H * len), Bars: `④ ${D.bars[3].txt}${n === 2 ? ' ; ⑥ ' + D.bars[5].txt : ''}` }, common, rebarBarrel(D, len, 'b2w')));
+    add('IfcSlab', nm + '-TOP', 'BX-TOP', 'STR', 'C-Barrel', [xz(s0, s1, i0 + sz.H, i1 + sz.H, i0 + sz.H + Ts, i1 + sz.H + Ts, -W / 2, W, 'concrete')],
+      Object.assign({ Group: 'b2', Form_m2: r4(n * sz.L * len + 2 * Ts * len), Bars: `① ${D.bars[0].txt} ; ③ ${D.bars[2].txt} ; ⑤ ${D.bars[4].txt}` }, common, rebarBarrel(D, len, 'b2t')));
+  }
+  add('IfcSlab', 'LEAN-BARREL', 'LEAN', 'STR', 'C-Lean', [xz(D.xa, D.xb, inv(D.xa) - Ts - D.lean, inv(D.xb) - Ts - D.lean, inv(D.xa) - Ts, inv(D.xb) - Ts, -W / 2, W, 'lean')],
+    { Description: 'คอนกรีตหยาบหนา 0.05 ม.', Group: 'lean' });
+
+  for (const T of D.ends) {
+    const X = xi => T.xe + T.sg * xi, iv = T.inv, t1 = sz.t1, t2 = sz.t2, LT = sz.LT, hw = D.hw, Htop = iv + sz.HT, bTop = iv + sz.H + Ts;
+    const tag = T.key;
+    // headwall (vertical curtain wall around the barrel end, 0.20 thick)
+    add('IfcWall', `HEADWALL-${tag}`, 'HW', 'STR', 'C-Headwall', [
+      box(X(0), X(hw), -BT / 2, BT / 2, bTop, Htop, 'concrete'),
+      box(X(0), X(hw), -BT / 2, -W / 2, iv, bTop, 'concrete'),
+      box(X(0), X(hw), W / 2, BT / 2, iv, bTop, 'concrete')],
+      { Group: 't2', 'Top_EL': EL(Htop), Thickness_m: hw, Form_m2: r4(2 * (BT * (Htop - iv) - W * (bTop - iv)) + BT * hw), Description: `กำแพงหน้าท่อ${T.name} สูง HT ${sz.HT} ม. จากพื้น` });
+    // transition floor + key under headwall + cut-off at the mouth
+    add('IfcSlab', `TR-${tag}-FLOOR`, 'TR-FLOOR', 'STR', 'C-Transition', [box(X(0), X(LT), -BT / 2, BT / 2, iv - t1, iv, 'concrete')],
+      { Group: 't1', Thickness_m: t1, Size_m: `${LT.toFixed(2)}x${BT.toFixed(2)}`, 'Top_EL': EL(iv), Form_m2: r4(2 * (LT + BT) * t1) });
+    add('IfcFooting', `TR-${tag}-KEY`, 'TR-KEY', 'STR', 'C-Transition', [box(X(0), X(D.key[0]), -BT / 2, BT / 2, iv - t1 - D.key[1], iv - t1, 'concrete')],
+      { Group: 't1', Description: 'เดือยกันซึมใต้กำแพงหน้าท่อ 0.35×0.25 ม.', Form_m2: 0 });
+    add('IfcFooting', `TR-${tag}-CUTOFF`, 'CUTOFF', 'STR', 'C-Transition', [box(X(LT - t2), X(LT), -BT / 2, BT / 2, iv - sz.e, iv - t1, 'concrete')],
+      { Group: 't1', Description: `กำแพงกันการกัดเซาะปลาย transition หนา t2 = ${t2} ลึก e = ${sz.e} ม. จากหลังพื้น`, 'Bottom_EL': EL(iv - sz.e), Form_m2: r4(2 * BT * (sz.e - t1)) });
+    // side walls: top slopes 1 : 1.5 from the headwall top down to 0.20 above the floor at the mouth
+    const k = Math.min(LT, hw + 1.5 * (sz.HT - 0.20)), prof = [[hw, iv], [LT, iv], [LT, iv + 0.20]];
+    if (k < LT - 1e-6) prof.push([k, iv + 0.20]);
+    prof.push([hw, Htop]);
+    const pr = prof.map(([xi, z]) => [X(xi), z]);
+    const wallA = H.polyArea(pr.map(([x, z]) => [x, 0, z]), [0, 1, 0]);
+    for (const [side, y0] of [['L', -BT / 2], ['R', BT / 2 - t2]])
+      add('IfcWall', `TR-${tag}-WALL-${side}`, 'TR-WALL', 'STR', 'C-Transition', [poly(pr, y0, t2, 'concrete')],
+        { Group: 't2', Thickness_m: t2, 'Elevation_m2': r4(wallA), Slope: '1:1.5', Form_m2: r4(2 * wallA + t2 * Math.hypot(k - hw, sz.HT - 0.20)) });
+    // lean concrete under floor / key / cut-off
+    add('IfcSlab', `LEAN-TR-${tag}`, 'LEAN', 'STR', 'C-Lean', [
+      box(X(D.key[0]), X(LT - t2), -BT / 2, BT / 2, iv - t1 - D.lean, iv - t1, 'lean'),
+      box(X(0), X(D.key[0]), -BT / 2, BT / 2, iv - t1 - D.key[1] - D.lean, iv - t1 - D.key[1], 'lean'),
+      box(X(LT - t2), X(LT), -BT / 2, BT / 2, iv - sz.e - D.lean, iv - sz.e, 'lean')], { Description: 'คอนกรีตหยาบหนา 0.05 ม.', Group: 'lean' });
+    // riprap channel: bed rises/falls from the floor level at the mouth to the channel bed (EL.1 / EL.3) over L_U / L_D
+    const a = LT, b = LT + T.Lc, zb = xi => iv + (T.ch - iv) * (xi - a) / (b - a), xA = X(a), xB = X(b);
+    const surf = (s) => {                                     // one side slope, s = ±1; returns [pts, inward normal]
+      const yA = s * (bu / 2), P = [[xA, yA, zb(a)], [xB, yA, zb(b)], [xB, s * (bu / 2 + 1.5 * (D.g - zb(b))), D.g], [xA, s * (bu / 2 + 1.5 * (D.g - zb(a))), D.g]].map(p => p.map(r4));
+      let nn = norm(cross(sub(P[1], P[0]), sub(P[3], P[0])));
+      if (nn[1] * s - 1.5 * nn[2] < 0) nn = nn.map(v => -v);
+      return [P, nn.map(v => Math.round(v * 1e5) / 1e5)];
+    };
+    const ripParts = [xz(xA, xB, zb(a) - D.rip, zb(b) - D.rip, zb(a), zb(b), -bu / 2, bu, 'riprap')];
+    const gravParts = [xz(xA, xB, zb(a) - D.rip - D.grav, zb(b) - D.rip - D.grav, zb(a) - D.rip, zb(b) - D.rip, -bu / 2, bu, 'gravel')];
+    let ripSide = 0;
+    for (const s of [-1, 1]) {
+      const [P, nn] = surf(s);
+      ripParts.push(['P', P, nn, D.rip, 'riprap']);
+      gravParts.push(['P', P.map(p => p.map((v, i) => r4(v + nn[i] * D.rip))), nn, D.grav, 'gravel']);
+      ripSide += H.polyArea(P, nn);
+    }
+    const ta = b - D.toe[0];
+    ripParts.push(xz(X(ta), xB, zb(Math.min(ta, b)) - D.toe[1], zb(b) - D.toe[1], Math.min(zb(ta), zb(b)) - D.rip - D.grav, Math.min(zb(ta), zb(b)) - D.rip - D.grav, -bu / 2, bu, 'riprap'));
+    const bedA = Math.hypot(b - a, zb(b) - zb(a)) * bu;
+    add('IfcCovering', `RIPRAP-${tag}`, 'RIPRAP', 'PROT', 'C-Protection', ripParts,
+      { Description: `หินเรียงหนา 0.30 ม. ร่องน้ำ${T.name} ยาว ${T.Lc} ม. ก้นกว้าง ${bu} ม. ลาดข้าง 1:1.5`, 'Bed_EL(mouth/end)': `${EL(zb(a)).toFixed(3)} / ${EL(zb(b)).toFixed(3)}`, Area_m2: r4(bedA + ripSide), BedSlope: `1:${(Math.abs((b - a) / (zb(b) - zb(a) || 1e-9))).toFixed(0)}` });
+    add('IfcCovering', `GRAVEL-${tag}`, 'GRAVEL', 'PROT', 'C-Protection', gravParts, { Description: 'กรวดหรือหินย่อยปนทรายหนา 0.15 ม. รองหินเรียง', Area_m2: r4(bedA + ripSide) });
+  }
+
+  // canal (context): embankment earth pieces extruded along y + concrete lining
+  const K = D.K, Lc = K.modelLength || 24, y0 = -Lc / 2, bed = D.bed, top = D.top, g = D.g;
+  add('IfcBuildingElementProxy', 'CANAL-FILL-BED', 'EMB', 'CTX', 'C-Earth', [poly([[-K.b / 2, g], [K.b / 2, g], [K.b / 2, bed], [-K.b / 2, bed]], y0, Lc, 'earth')], { Description: 'ดินถมใต้ท้องคลอง (บริบท)', ClashExempt: true });
+  for (const s of [-1, 1]) {
+    const pts = [[s * K.b / 2, g], [s * K.b / 2, bed], [s * D.xCrest, top], [s * D.xOut, top], [s * D.xToe, g]];
+    add('IfcBuildingElementProxy', `CANAL-BANK-${s < 0 ? 'U' : 'D'}`, 'EMB', 'CTX', 'C-Earth', [poly(s < 0 ? pts : pts.slice().reverse(), y0, Lc, 'earth')],
+      { Description: 'คันคลองดินถมบดอัด 95% S.P.C.T. (บริบท)', ClashExempt: true });
+  }
+  const ln = K.lining, h = top - bed, nv = [-1, K.z].map(v => v / Math.hypot(1, K.z));
+  const lin = [poly([[-K.b / 2, bed], [K.b / 2, bed], [K.b / 2, bed + ln], [-K.b / 2, bed + ln]], y0, Lc, 'lining')];
+  for (const s of [-1, 1]) {
+    const P0 = [s * K.b / 2, bed], P1 = [s * D.xCrest, top], o = [s * nv[0] * ln, nv[1] * ln];
+    lin.push(poly([P0, P1, [P1[0] + o[0], P1[1] + o[1]], [P0[0] + o[0], P0[1] + o[1]]], y0, Lc, 'lining'));
+  }
+  add('IfcCovering', 'CANAL-LINING', 'LINING', 'CTX', 'C-Canal', lin, { Description: `คอนกรีตดาดคลองหนา ${ln} ม. ก้นคลองกว้าง ${K.b} ม. ลาด 1:${K.z} (บริบท)`, ClashExempt: true });
+  const ext = D.xToe + 4;
+  add('IfcBuildingElementProxy', 'SITE-GROUND', 'SITE', 'CTX', 'Site', [box(Math.min(D.ends[0].xe - sz.LT - sz.LU - 3, -ext), Math.max(D.ends[1].xe + sz.LT + sz.LD + 3, ext), -Lc / 2, Lc / 2, -0.05, 0, 'ground')], { Description: 'ระดับดินเดิม (อ้างอิง)' });
+  return E;
+}
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = a => { const l = Math.hypot(a[0], a[1], a[2]); return a.map(v => v / l); };
+
+// barrel reinforcement per segment (lengths assumed from the standard section — see takeoff basis text)
+function rebarBarrel(D, len, part) {
+  const { n, sz, W, Ts, Tw, Hout } = D, B = D.bars, kg = {}, put = (b, m) => { kg[b.d] = (kg[b.d] || 0) + m * KGM[b.d]; };
+  const trans = (b, Lbar) => put(b, (len / b.s + 1) * Lbar);          // transverse bars spaced along the barrel
+  const longi = (b, width) => put(b, (width / b.s + 1) * len * 1.05);   // longitudinal bars, 5% laps
+  if (part === 'b1') { trans(B[1], W + 0.80); trans(B[2], n * (sz.L + 1.0)); longi(B[4], 2 * W); }
+  if (part === 'b2t') { trans(B[0], W + 0.80); trans(B[2], n * (sz.L + 1.0)); longi(B[4], 2 * W); }
+  if (part === 'b2w') {
+    trans(B[3], 2 * 2 * (Hout + 0.30));                                   // outer walls, both faces
+    if (n === 2) trans(B[5], 2 * (Hout + 0.30)); else trans(B[3], 0);     // middle wall, both faces
+    longi(B[4], (n + 1) * 2 * sz.H);
+  }
+  const o = {}; for (const [d, v] of Object.entries(kg)) o[`Rebar_DB${d}_kg`] = Math.round(v * 10) / 10;
+  return o;
+}
+
+// ---------------------------------------------------------------- takeoff
+function volBelow(p, zc) {            // part volume below the plane z = zc
+  if (p[0] === 'B') { const lo = p[5], hi = Math.min(p[6], zc); return hi <= lo ? 0 : (p[2] - p[1]) * (p[4] - p[3]) * (hi - lo); }
+  if (p[0] === 'P' && Math.abs(p[2][2]) < 1e-9) {
+    const P = p[1], out = [];
+    for (let i = 0; i < P.length; i++) {
+      const a = P[i], b = P[(i + 1) % P.length], ia = a[2] <= zc, ib = b[2] <= zc;
+      if (ia) out.push(a);
+      if (ia !== ib) { const t = (zc - a[2]) / (b[2] - a[2]); out.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), zc]); }
+    }
+    return out.length < 3 ? 0 : H.polyArea(out, p[2]) * p[3];
+  }
+  return H.partVolume(p);
+}
+function takeoff(spec, E) {
+  const D = design(spec), Q = {}, desc = spec.takeoffDesc || {};
+  const add = (k, v, basis) => { const d = desc[k] || [k, '', '']; Q[k] = { key: k, desc: d[0], unit: d[1], qty: Math.round(v * 1000) / 1000, basis: basis || d[2] }; };
+  const vol = e => e.parts.reduce((s, p) => s + H.partVolume(p), 0);
+  const grp = gk => E.filter(e => e.attrs.Group === gk);
+  const { sz, n } = D;
+  // concrete / formwork / rebar by pour group
+  const G = { b1: 'พื้นท่อ', b2: 'ผนังและพื้นบนท่อ', t1: 'พื้น เดือย กำแพงปลาย transition', t2: 'ผนัง transition และกำแพงหน้าท่อ' };
+  const rebarByDia = {};
+  for (const gk of Object.keys(G)) {
+    const es = grp(gk);
+    add('c_' + gk, es.reduce((s, e) => s + vol(e), 0), `${es.length} ชิ้น: ${[...new Set(es.map(e => e.mark))].join(', ')} — ปริมาตรจากรูปทรงโมเดล`);
+    add('f_' + gk, es.reduce((s, e) => s + (e.attrs.Form_m2 || 0), 0));
+    let kgs = 0;
+    if (gk[0] === 'b') for (const e of es) for (const [k, v] of Object.entries(e.attrs)) { const m = /^Rebar_DB(\d+)_kg$/.exec(k); if (m) { kgs += v; rebarByDia[m[1]] = (rebarByDia[m[1]] || 0) + v; } }
+    if (gk[0] === 't') {                  // transition/headwall: DB12@0.20 two layers each way (ตามตารางเหล็กเสริม transition) on the member mid-plane area
+      const perM2 = 2 * 2 * (1 / 0.20) * KGM[12] * 1.05;
+      for (const e of es) { const t = e.attrs.Thickness_m || Math.min(...e.parts.map(p => p[0] === 'B' ? Math.min(p[2] - p[1], p[4] - p[3], p[6] - p[5]) : p[3])); const k = vol(e) / Math.max(t, 0.20) * perM2; kgs += k; rebarByDia[12] = (rebarByDia[12] || 0) + k; }
+    }
+    add('r_' + gk, kgs);
+  }
+  add('lean', grp('lean').reduce((s, e) => s + vol(e), 0));
+  const rip = E.filter(e => e.mark === 'RIPRAP'), grav = E.filter(e => e.mark === 'GRAVEL');
+  add('rip', rip.reduce((s, e) => s + vol(e), 0)); add('grav', grav.reduce((s, e) => s + vol(e), 0));
+  // joints
+  const perim = 2 * (D.W - D.Tw + D.Hout - D.Ts), joints = D.nseg - 1;
+  add('ws_b', 2 * perim, `2 รอยต่อท่อ–transition × เส้นรอบรูปกึ่งกลางผนัง ${perim.toFixed(2)} ม.`);
+  add('ws_c', joints * perim, `${joints} รอยต่อหดตัวในท่อ (ท่อยาว ${D.Lb.toFixed(2)} ม. แบ่ง ${D.nseg} ช่วง) × ${perim.toFixed(2)} ม.`);
+  const endA = D.W * D.Hout - n * sz.L * sz.H;
+  add('filler', (2 + joints) * endA, `${2 + joints} รอยต่อ × พื้นที่หน้าตัดคอนกรีตท่อ ${endA.toFixed(2)} ตร.ม.`);
+  // earthwork: integrate trench cross-sections along x (step 0.05 m)
+  const s = D.exs, ws = D.ws, dx = 0.05;
+  const secAt = x => {                           // structure zone: [bottom z, bottom width, structure width, top of structure envelope]
+    if (x >= D.xa && x <= D.xb) { const iv = D.inv(x); return [iv - D.Ts - D.lean, D.W + 2 * ws, D.W, Math.min(0, iv + sz.H + D.Ts)]; }
+    for (const T of D.ends) {
+      const xi = (x - T.xe) * T.sg; if (xi < 0 || xi > sz.LT) continue;
+      const iv = T.inv, zb = xi < D.key[0] ? iv - sz.t1 - D.key[1] - D.lean : xi > sz.LT - sz.t2 ? iv - sz.e - D.lean : iv - sz.t1 - D.lean;
+      return [zb, D.BT + 2 * ws, D.BT, 0];
+    }
+    return null;
+  };
+  let exS = 0, bf = 0, clr = 0;
+  for (let x = D.ends[0].xe - sz.LT + dx / 2; x < D.ends[1].xe + sz.LT; x += dx) {
+    const q = secAt(x); if (!q) continue;
+    const d = Math.max(0, D.g - q[0]), A = d * (q[1] + s * d);
+    exS += A * dx; bf += (A - q[2] * (q[3] - q[0])) * dx; clr += (q[1] + 2 * s * d) * dx;
+  }
+  let exC = 0;
+  for (const T of D.ends) {
+    const iv = T.inv, a = sz.LT, b = sz.LT + T.Lc, zb = xi => iv + (T.ch - iv) * (xi - a) / (b - a);
+    for (let xi = a + dx / 2; xi < b; xi += dx) {
+      const d = D.g - zb(xi), t = D.rip + D.grav;
+      exC += (d * (D.bu + 1.5 * d) + (D.bu + 2 * d * Math.hypot(1, 1.5)) * t) * dx; clr += (D.bu + 2 * 1.5 * d + 2) * dx;
+    }
+    exC += D.toe[0] * (D.toe[1] - D.rip - D.grav) * D.bu;
+  }
+  add('exc', exS + exC, `ร่องโครงสร้าง ${exS.toFixed(1)} ลบ.ม. (ก้นกว้างเผื่อข้างละ ${ws} ม. ลาด 1:${s}) + ร่องหินเรียง ${exC.toFixed(1)} ลบ.ม. — อินทิเกรตหน้าตัดทุก 0.05 ม.; ไม่รวมลาดปลายร่อง`);
+  add('bf', bf, 'ร่องโครงสร้างลบด้วยขอบเขตโครงสร้างใต้ระดับดินเดิม (รวมช่องน้ำในท่อ/transition ที่ไม่ถม)');
+  add('clear', clr, 'พื้นที่ปากร่องขุด + ร่องหินเรียง (เผื่อข้างละ 1 ม.)');
+  // embankment + lining reinstatement over the trench width at the canal
+  const d0 = D.g - (D.inv(0) - D.Ts - D.lean), Wz = D.W + 2 * ws + 2 * s * d0, K = D.K;
+  const embA = (D.bed - D.g) * K.b + 2 * H.polyArea([[K.b / 2, 0, D.g], [K.b / 2, 0, D.bed], [D.xCrest, 0, D.top], [D.xOut, 0, D.top], [D.xToe, 0, D.g]], [0, 1, 0]);
+  add('emb', embA * Wz, `หน้าตัดคันคลอง ${embA.toFixed(2)} ตร.ม. × ความกว้างร่องขุดที่แนวคลอง ${Wz.toFixed(2)} ม.`);
+  const linA = K.lining * (K.b + 2 * (D.top - D.bed) * Math.hypot(1, K.z));
+  add('lining', linA * Wz, `ดาดหนา ${K.lining} ม. เส้นรอบรูป ${(linA / K.lining).toFixed(2)} ม. × ${Wz.toFixed(2)} ม.`);
+  add('grass', 2 * Math.hypot(1, K.outer) * (D.top - D.g) * Wz + 2 * K.crest * Wz, 'ลาดนอกคันคลอง + หลังคัน ช่วงเหนือร่องขุด');
+  for (const [k, m] of Object.entries(spec.manualQty || {})) Q[k] = { key: k, desc: m.desc, unit: m.unit, qty: m.qty, basis: m.basis, manual: true };
+  const info = Object.entries(rebarByDia).sort((a, b) => a[0] - b[0]).map(([d, v]) => ({ d: Number(d), kg: v }));
+  return { Q, openings: [], rebarByDia: info, kpi: { label: 'ม. ท่อ', qty: D.Lb, basis: `ท่อยาว ${D.Lb.toFixed(2)} ม.` }, checks: checks(D), design: summary(D) };
+}
+
+function summary(D) {
+  const { sz, n } = D, E = v => (v + D.dat).toFixed(2);
+  return [
+    ['แบบมาตรฐาน', 'มฐ04-62 ท่อลอดคลองส่งน้ำ ค.ส.ล. แบบที่ 1 (ตรง) หล่อในที่'],
+    ['ขนาดท่อ', `${n} ช่อง × ${sz.L.toFixed(2)} × ${sz.H.toFixed(2)} ม. (Q สูงสุดตามตาราง ${sz.Q[n - 1]} ลบ.ม./วินาที)`],
+    ['ความยาวท่อ', `ต้นน้ำ ${D.Lup.toFixed(2)} + ท้ายน้ำ ${D.Ldn.toFixed(2)} = ${D.Lb.toFixed(2)} ม. · ${D.nseg} ช่วงหล่อ (รอยต่อหดตัว ${D.nseg - 1} แห่ง)`],
+    ['ดินถมหลังท่อ hc', `${D.hc.toFixed(2)} ม. → แถวตาราง ${D.row[0].toFixed(2)}–${D.row[1].toFixed(2)} · Ts ${D.Ts} · Tw ${D.Tw}`],
+    ['เหล็กเสริมท่อ', D.bars.map((b, i) => `${'①②③④⑤⑥'[i]} ${b.txt}`).join('  ')],
+    ['Transition', `HT ${sz.HT} · LT ${sz.LT} · BT ${D.BT} · t1 ${sz.t1} · t2 ${sz.t2} · e ${sz.e}`],
+    ['ร่องหินเรียง', `LU ${sz.LU} / LD ${sz.LD} ม. · ก้นกว้าง ${D.bu} ม. · ลาด 1:1.5 · หินเรียง 0.30 บนกรวด 0.15`],
+    ['ระดับ', `ดินเดิม ${E(0)} · EL.5 ${E(D.inv5)} · EL.6 ${E(D.inv6)} · EL.1 ${E(D.ends[0].ch)} · EL.3 ${E(D.ends[1].ch)} · ท้องคลอง ${E(D.bed)} · หลังคัน ${E(D.top)}`],
+  ];
+}
+function checks(D) {
+  const { sz } = D, out = [], ck = (item, val, lim, ok, note) => out.push({ item, val, lim, ok, note: note || '' });
+  ck('ดินถมหลังท่อ hc อยู่ในช่วงตาราง 0.60–5.00 ม.', D.hc.toFixed(2) + ' ม.', '0.60–5.00', D.hc >= 0.595 && D.hc <= 5.005, 'hc น้อยกว่า 0.60 ต้องออกแบบพิเศษหรือลดระดับท่อ');
+  const sBarrel = (D.inv5 - D.inv6) / D.Lb;
+  ck('ความลาดท้องท่อ (EL.5 → EL.6)', (sBarrel * 100).toFixed(2) + ' %', '≥ 0', sBarrel >= 0);
+  for (const T of D.ends) {
+    const sl = Math.abs(T.ch - T.inv) / T.Lc, lim = T.key === 'U' ? 4 : 6;
+    ck(`ลาดก้นร่องหินเรียง${T.name} (${T.chName} กับปากท่อ)`, sl ? '1:' + (1 / sl).toFixed(1) : 'ราบ', `ชันไม่เกิน 1:${lim}`, sl <= 1 / lim + 1e-9);
+    ck(`ระดับก้นร่อง${T.name}ต่ำกว่าดินเดิม`, ((D.g - T.ch)).toFixed(2) + ' ม.', '> 0', T.ch < D.g);
+  }
+  const hwTop = D.inv5 + sz.HT, emb = D.slopeZ(D.xa - D.hw);
+  ck('สันกำแพงหน้าท่อต้นน้ำสูงกว่าผิวคันดิน', (hwTop - emb).toFixed(2) + ' ม.', '≈ 0.10', hwTop - emb >= 0.05);
+  const hwTopD = D.inv6 + sz.HT, embD = D.slopeZ(D.xb + D.hw);
+  ck('สันกำแพงหน้าท่อท้ายน้ำสูงกว่าผิวคันดิน', (hwTopD - embD).toFixed(2) + ' ม.', '≈ 0.10', hwTopD - embD >= 0.05);
+  ck('หลังท่อต่ำกว่าท้องคลองรวมดาด', (D.bed - D.K.lining - (D.inv(0) + sz.H + D.Ts)).toFixed(2) + ' ม.', '> 0', D.bed - D.K.lining > D.inv(0) + sz.H + D.Ts);
+  return out;
+}
+
+const API = { STD, BARS, design, generate, takeoff, volBelow };
+H.register('culvert', { generate, takeoff });
+if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.CulvertEngine = API;
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>
+(function(){
+'use strict';
+const $ = s => document.querySelector(s);
+const H = window.HouseEngine;
+const TEMPLATES = { house: JSON.parse(document.getElementById('tpl-type03').textContent), culvert: JSON.parse(document.getElementById('tpl-culvert').textContent) };
+const TEMPLATE = TEMPLATES.house;
+const RBT = document.getElementById('rb-template').textContent;
+const CATC = {S:'var(--c-S)',A:'var(--c-A)',P:'var(--c-P)',E:'var(--c-E)'}, PAL = ['var(--c-S)','var(--c-A)','var(--c-P)','var(--c-E)','var(--gantt)','var(--warn)'];
+const CATN = {S:'โครงสร้าง',A:'สถาปัตย์',P:'สุขาภิบาล',E:'ไฟฟ้า'};
+const isHouse = () => (S.spec.type || 'house') === 'house';
+const catIdx = c => Math.max(0, (S.spec.boq || []).findIndex(x => x.code === c));
+const catC = c => isHouse() && CATC[c] ? CATC[c] : PAL[catIdx(c) % PAL.length];
+const catN = c => { if (isHouse() && CATN[c]) return CATN[c]; const b = (S.spec.boq || []).find(x => x.code === c); return b ? b.title.replace(/^หมวดที่\s*\d+\s*/, '').replace(/^งาน/, '') : c; };
+const perUnit = () => { const k = S.R && S.R.TO.kpi; return k ? { label: k.label, qty: k.qty } : { label: 'ตร.ม.', qty: S.spec.meta.grossArea }; };
+const rbModule = () => (S.spec.ruby && S.spec.ruby.module) || 'Type03BIM';
+const TABS = [['summary','สรุป'],['spec','ข้อมูลแบบ'],['model','โมเดล 3D'],['check','ตรวจสอบ'],['qto','ปริมาณงาน'],['boq','BOQ'],['plan','แผนงาน'],['scurve','S-Curve'],['export','ส่งออก']];
+const S = { spec: clone(TEMPLATE), id: null, name: TEMPLATE.name, dirty: false, saved: false, R: null, err: null, clash: null, tab: 'summary', db: null, dl: null, projects: [], sel: null, geomVer: 0, viewVer: -1, saving: false };
+try { const t = localStorage.getItem('hbs.tab'); if (t && TABS.some(x => x[0] === t)) S.tab = t; } catch (e) {}
+
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = (v, d=0) => v == null || isNaN(v) ? '–' : Number(v).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+const thDate = s => { if (!s) return '–'; const [y,m,d] = s.split('-').map(Number); const M = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']; return `${d} ${M[m-1]} ${y+543}`; };
+
+// ---------------------------------------------------------------- compute
+function recompute(geom){
+  try { S.R = H.run(S.spec); S.err = null; if (geom !== false) S.geomVer++; }
+  catch (e) { S.err = e.message || String(e); }
+  S.clash = null;
+  renderTop(); renderTab();
+}
+function touch(geom){ S.dirty = true; recompute(geom); scheduleSave(); }
+
+// ---------------------------------------------------------------- persistence (db) + downloads
+let saveTimer = null;
+function scheduleSave(){ if (!S.db || !S.id) { setStatus(); return; } clearTimeout(saveTimer); saveTimer = setTimeout(save, 1500); setStatus(); }
+async function save(){
+  if (!S.db) { setStatus('ไม่มีที่เก็บข้อมูลในมุมมองนี้ — ใช้ “ส่งออก → ไฟล์โครงการ JSON”'); return; }
+  if (S.saving) { scheduleSave(); return; }
+  S.saving = true; clearTimeout(saveTimer);
+  try {
+    if (!S.id) S.id = 'p' + Date.now().toString(36);
+    S.spec.name = S.name;
+    await S.db.doc('projects/' + S.id).set({ name: S.name, updatedAt: new Date().toISOString(), spec: S.spec });
+    S.dirty = false; S.saved = true; setStatus();
+  } catch (e) {
+    setStatus(e && e.code === 'quota_exceeded' ? 'ที่เก็บเต็ม — ลบโครงการเก่าก่อน' : 'บันทึกไม่สำเร็จ: ' + (e && (e.code || e.message)));
+  } finally { S.saving = false; }
+}
+function setStatus(msg){
+  const d = $('#sdot'), t = $('#stext');
+  if (msg) { d.className = 'dot dirty'; t.textContent = msg; return; }
+  if (!S.id) { d.className = 'dot'; t.textContent = S.dirty ? 'มีการแก้ไข ยังไม่บันทึก' : 'แม่แบบ ยังไม่บันทึก'; return; }
+  d.className = 'dot ' + (S.dirty ? 'dirty' : 'ok'); t.textContent = S.dirty ? 'กำลังรอบันทึก…' : 'บันทึกแล้ว';
+}
+function renderProjects(){
+  const el = $('#plist');
+  if (!S.projects.length) { el.innerHTML = `<p class="note">${S.db ? 'ยังไม่มีโครงการที่บันทึก กด “บันทึก” เพื่อเก็บงานที่เปิดอยู่' : ''}</p>`; return; }
+  el.innerHTML = S.projects.map(p => `<button class="pitem ${p.id === S.id ? 'on' : ''}" data-open="${esc(p.id)}"><span>${esc(p.name)}</span><small>${esc((p.updatedAt||'').slice(0,16).replace('T',' '))}</small></button>`).join('');
+}
+async function openProject(id){
+  if (!S.db) return;
+  const snap = await S.db.doc('projects/' + id).get();
+  if (!snap.exists) return;
+  const d = snap.data();
+  S.spec = clone(d.spec); S.id = id; S.name = d.name || S.spec.name; S.dirty = false; S.saved = true;
+  $('#pname').value = S.name; renderProjects(); recompute(); setStatus();
+}
+(async function initCaps(){
+  const cl = (window.claude && window.claude.use) ? window.claude : window.HBSLocalCaps;
+  if (!cl || !cl.use) { $('#dbnote').textContent = 'บันทึก/ดาวน์โหลดใช้ไม่ได้ในเบราว์เซอร์นี้'; return; }
+  const local = cl === window.HBSLocalCaps;
+  cl.use('downloads').then(dl => { S.dl = dl; if (S.tab === 'export') renderTab(); });
+  const db = await cl.use('db');
+  if (!db) { $('#dbnote').textContent = 'ที่เก็บข้อมูลใช้ไม่ได้ในมุมมองนี้ — ส่งออก JSON เพื่อเก็บงาน'; return; }
+  S.db = db; $('#dbnote').textContent = local ? 'โหมดออฟไลน์: บันทึกไว้ในเบราว์เซอร์นี้เท่านั้น — ส่งออก JSON เพื่อสำรอง/ย้ายเครื่อง' : '';
+  let first = true;
+  db.collection('projects').orderBy('updatedAt', 'desc').onSnapshot(snap => {
+    S.projects = snap.docs.map(d => ({ id: d.id, name: (d.data() || {}).name || d.id, updatedAt: (d.data() || {}).updatedAt }));
+    renderProjects();
+    if (first) { first = false; if (!S.id && !S.dirty && S.projects.length) openProject(S.projects[0].id); }
+  }, err => { $('#dbnote').textContent = 'เชื่อมที่เก็บข้อมูลไม่ได้ (' + err.code + ')'; });
+  setStatus();
+})();
+async function offer(filename, data){
+  if (!S.dl) { alertBox('การดาวน์โหลดใช้ไม่ได้ในมุมมองนี้'); return; }
+  try { await S.dl.save({ filename, data }); }
+  catch (e) { if (e && e.code !== 'declined') alertBox('ดาวน์โหลดไม่สำเร็จ: ' + (e.code || e.message)); }
+}
+function alertBox(msg){ const w = $('#work'); const p = document.createElement('div'); p.className = 'panel err'; p.textContent = msg; w.prepend(p); setTimeout(() => p.remove(), 6000); }
+
+// ---------------------------------------------------------------- top
+function renderTop(){
+  const R = S.R, k = $('#kpis');
+  if (!R) { k.innerHTML = `<div class="kpi"><div class="l">สถานะ</div><div class="v err">ข้อมูลแบบมีข้อผิดพลาด</div></div>`; return; }
+  const B = R.BQ, SC = R.SC, ref = S.spec.meta.refEstimate, pu = perUnit(), area = pu.qty;
+  const diff = ref ? B.total / ref - 1 : null;
+  k.innerHTML = [
+    ['ราคารวม' + (S.spec.plan.useFactorF ? ' (×F)' : ''), fmt(B.total), `ต้นทุนตรง ${fmt(B.direct)}`],
+    ['Factor F', B.F.toFixed(4), S.spec.plan.useFactorF ? 'จากตาราง (ค่าประมาณ)' : 'ปิดอยู่'],
+    ['บาท/' + pu.label, fmt(area ? B.total / area : null), isHouse() ? `พื้นที่ ${fmt(area,1)} ตร.ม.` : `${pu.label.replace(/^ม\. /,'')}ยาว ${fmt(area,2)} ม.`],
+    ['เทียบประมาณการอ้างอิง', diff == null ? '–' : (diff >= 0 ? '+' : '') + (diff*100).toFixed(1) + '%', ref ? fmt(ref) + ' บาท' : 'ไม่ได้ระบุ'],
+    ['ระยะเวลา', `${SC.days} วัน`, `${SC.weeks} สัปดาห์ · ${SC.workdays} วันทำการ`],
+    ['แล้วเสร็จ', thDate(SC.end), 'เริ่ม ' + thDate(SC.start)],
+    ['โมเดล', `${R.E.length} ชิ้น`, S.clash ? (S.clash.length ? `ชนกัน ${S.clash.length} คู่` : 'ไม่พบการชน') : 'ยังไม่ตรวจการชน']
+  ].map(([l,v,s]) => `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join('');
+}
+function renderTabs(){
+  $('#tabs').innerHTML = TABS.map(([id, t]) => `<button class="tab ${S.tab === id ? 'on' : ''}" role="tab" aria-selected="${S.tab === id}" data-tab="${id}">${t}</button>`).join('');
+}
+function renderTab(){
+  renderTabs();
+  const w = $('#work');
+  if (S.err && S.tab !== 'spec') { w.innerHTML = `<div class="panel"><h3>คำนวณไม่ได้</h3><p class="err">${esc(S.err)}</p><p class="note">แก้ข้อมูลในแท็บ “ข้อมูลแบบ”</p></div>`; return; }
+  ({ summary: tSummary, spec: tSpec, model: tModel, check: tCheck, qto: tQto, boq: tBoq, plan: tPlan, scurve: tScurve, export: tExport })[S.tab](w);
+}
+
+// ---------------------------------------------------------------- summary
+function catBar(B){
+  return `<div class="bar">${B.cats.map(c => `<span title="${esc(c.title)}" style="width:${(c.total / B.direct * 100).toFixed(2)}%;background:${catC(c.code)}"></span>`).join('')}</div>`;
+}
+function tSummary(w){
+  const R = S.R, B = R.BQ, SC = R.SC;
+  const crit = SC.acts.filter(a => a.critical).map(a => a.id).join(' → ');
+  w.innerHTML = `
+  <div class="grid2">
+    <div class="panel"><h3>ต้นทุนแยกหมวด</h3>${catBar(B)}
+      <div class="scroll"><table style="margin-top:10px"><thead><tr><th>หมวด</th><th class="n">ค่าวัสดุ</th><th class="n">ค่าแรง</th><th class="n">รวม</th><th class="n">%</th></tr></thead><tbody>
+      ${B.cats.map(c => `<tr><td><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${catC(c.code)};margin-right:6px"></i>${esc(c.title)}</td><td class="n">${fmt(c.mat)}</td><td class="n">${fmt(c.lab)}</td><td class="n">${fmt(c.total)}</td><td class="n">${(c.total/B.direct*100).toFixed(1)}</td></tr>`).join('')}
+      <tr class="tot"><td>ต้นทุนตรงรวม</td><td class="n">${fmt(B.mat)}</td><td class="n">${fmt(B.lab)}</td><td class="n">${fmt(B.direct)}</td><td class="n">100.0</td></tr>
+      <tr class="tot"><td>× Factor F ${B.F.toFixed(4)}</td><td></td><td></td><td class="n">${fmt(B.total)}</td><td></td></tr></tbody></table></div></div>
+    <div class="panel"><h3>ความก้าวหน้าสะสม</h3>${scurveSVG(SC, 520, 230)}
+      <p class="note">สายงานวิกฤต: ${esc(crit)}</p></div>
+  </div>
+  <div class="panel"><h3>งวดงานทุก 4 สัปดาห์</h3><div class="scroll"><table><thead><tr><th>งวด</th><th>สิ้นสัปดาห์ที่</th><th>วันที่</th><th class="n">สะสม %</th><th class="n">มูลค่าสะสม (บาท)</th><th class="n">มูลค่างวด (บาท)</th></tr></thead><tbody>
+  ${milestones(SC).map(m => `<tr><td>งวดที่ ${m.k}</td><td>${m.week}</td><td>${thDate(m.date)}</td><td class="n">${(m.pct*100).toFixed(1)}</td><td class="n">${fmt(m.cum)}</td><td class="n">${fmt(m.inc)}</td></tr>`).join('')}
+  </tbody></table></div></div>`;
+}
+function milestones(SC){
+  const out = []; let prev = 0;
+  for (let k = 1; k <= Math.ceil(SC.weeks / 4); k++) { const wk = Math.min(4 * k, SC.weeks), r = SC.W[wk - 1]; out.push({ k, week: wk, date: r.we, pct: r.pct, cum: r.cum, inc: r.cum - prev }); prev = r.cum; }
+  return out;
+}
+
+// ---------------------------------------------------------------- charts (SVG)
+function scurveSVG(SC, Wd, Ht, full){
+  const pad = {l:44, r:12, t:12, b:28}, W = SC.W, n = W.length, iw = Wd - pad.l - pad.r, ih = Ht - pad.t - pad.b;
+  const x = i => pad.l + (i + 0.5) * iw / n, y = v => pad.t + ih * (1 - v);
+  const maxW = Math.max(...W.map(r => r.value)) || 1;
+  let s = `<svg viewBox="0 0 ${Wd} ${Ht}" width="100%" role="img" aria-label="S-Curve">`;
+  for (const v of [0, .25, .5, .75, 1]) s += `<line x1="${pad.l}" x2="${Wd-pad.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line2)"/><text x="${pad.l-6}" y="${y(v)+4}" font-size="10.5" text-anchor="end" fill="var(--muted)">${v*100}%</text>`;
+  const bw = Math.max(2, iw / n * 0.6);
+  W.forEach((r, i) => { s += `<rect x="${x(i)-bw/2}" y="${y(r.value/maxW*0.45)}" width="${bw}" height="${ih*r.value/maxW*0.45}" fill="var(--accent-soft)"/>`; });
+  const step = Math.max(1, Math.ceil(n / 10));
+  W.forEach((r, i) => { if (i % step === 0 || i === n - 1) s += `<text x="${x(i)}" y="${Ht-10}" font-size="10.5" text-anchor="middle" fill="var(--muted)">${r.week}</text>`; });
+  if (full) for (const c of Object.keys(SC.catTot)) s += `<polyline fill="none" stroke="${catC(c)}" stroke-width="1.5" stroke-dasharray="4 3" points="${W.map((r,i)=>`${x(i)},${y(r.cumCatPct[c])}`).join(' ')}"/>`;
+  s += `<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="${W.map((r,i)=>`${x(i)},${y(r.pct)}`).join(' ')}"/>`;
+  const last = W[n-1]; s += `<circle cx="${x(n-1)}" cy="${y(last.pct)}" r="3.5" fill="var(--accent)"/>`;
+  s += `<text x="${pad.l}" y="${Ht-1}" font-size="10" fill="var(--muted)">สัปดาห์</text></svg>`;
+  return s;
+}
+function ganttSVG(SC){
+  const A = SC.acts, n = SC.weeks, rowH = 22, lw = 290, cw = Math.max(26, Math.min(40, 900 / n)), Wd = lw + n * cw + 10, Ht = 30 + A.length * rowH + 8;
+  const d0 = Date.parse(SC.start), px = iso => lw + (Date.parse(iso) - d0) / 864e5 / 7 * cw;
+  let s = `<svg viewBox="0 0 ${Wd} ${Ht}" width="${Wd}" height="${Ht}" role="img" aria-label="Gantt">`;
+  for (let k = 0; k < n; k++) s += `<rect x="${lw+k*cw}" y="0" width="${cw}" height="${Ht}" fill="${k%2?'var(--sunk)':'none'}"/><text x="${lw+k*cw+cw/2}" y="18" font-size="10.5" text-anchor="middle" fill="var(--muted)">${k+1}</text>`;
+  A.forEach((a, i) => {
+    const y0 = 30 + i * rowH, x0 = px(a.stISO), x1 = px(a.finISO) + cw / 7;
+    s += `<text x="4" y="${y0+15}" font-size="11.5" fill="var(--ink)">${esc(a.id)} ${esc(a.name.length > 34 ? a.name.slice(0,33)+'…' : a.name)}</text>`;
+    s += `<rect x="${x0}" y="${y0+5}" width="${Math.max(3,x1-x0)}" height="${rowH-10}" rx="2" fill="${a.critical ? 'var(--crit)' : 'var(--gantt)'}"/>`;
+  });
+  return s + '</svg>';
+}
+
+// ---------------------------------------------------------------- spec tab
+function getPath(o, p){ return p.split('.').reduce((a, k) => a == null ? a : a[k], o); }
+function setPath(o, p, v){ const ks = p.split('.'); let a = o; ks.slice(0,-1).forEach(k => a = a[k]); a[ks.at(-1)] = v; }
+const QUICK_C = [
+  ['culvert.size','ขนาดช่องท่อ L×H (ม.)','sel',[['1.80','1.80 × 1.80'],['2.10','2.10 × 2.10'],['2.40','2.40 × 2.40']]],['culvert.barrels','จำนวนช่อง','seln',[[1,'1 ช่อง'],[2,'2 ช่อง']]],
+  ['culvert.lengthUp','ความยาวท่อด้านต้นน้ำ (ม. หรือ auto)','auto'],['culvert.lengthDn','ความยาวท่อด้านท้ายน้ำ (ม. หรือ auto)','auto'],
+  ['levels.ground','ระดับดินเดิม (ม.รทก.)','num'],['levels.el5','EL.5 ท้องท่อต้นน้ำ','num'],['levels.el6','EL.6 ท้องท่อท้ายน้ำ','num'],['levels.el1','EL.1 ก้นร่องต้นน้ำ','num'],['levels.el3','EL.3 ก้นร่องท้ายน้ำ','num'],
+  ['canal.bed','ระดับท้องคลองส่งน้ำ','num'],['canal.bankTop','ระดับหลังคันคลอง','num'],['canal.b','ความกว้างก้นคลอง (ม.)','num'],['canal.z','ลาดข้างคลองด้านใน 1:z','num'],['canal.crest','ความกว้างหลังคัน (ม.)','num'],['canal.outer','ลาดคันด้านนอก 1:z','num'],['canal.lining','ความหนาดาดคลอง (ม.)','num'],
+  ['site.workSpace','ระยะเผื่อทำงานข้างโครงสร้าง (ม.)','num'],['site.excSlope','ลาดขุด 1:z','num'],
+  ['plan.start','วันเริ่มงาน','date'],['meta.refEstimate','ประมาณการอ้างอิง (บาท)','num'],['plan.useFactorF','คูณ Factor F','bool']];
+const QUICK = [
+  ['plan.start','วันเริ่มงาน','date'],['meta.grossArea','พื้นที่อาคารในร่ม (ตร.ม.)','num'],['meta.refEstimate','ประมาณการอ้างอิง (บาท)','num'],
+  ['plan.useFactorF','คูณ Factor F','bool'],['foundation.pile.length','ความยาวเสาเข็ม (ม.)','num'],['foundation.pile.safeLoad_t','น้ำหนักปลอดภัยเข็ม (ตัน/ต้น)','num'],
+  ['levels.ffl','ระดับพื้นเสร็จ FFL (ม.)','num'],['levels.beamTop','ระดับหลังคาน (ม.)','num'],['levels.footingTop','ระดับหลังฐานราก (ม.)','num'],
+  ['levels.ceilWest','ระดับฝ้า ปีกตะวันตก','num'],['levels.ceilEast','ระดับฝ้า ปีกตะวันออก','num'],['wallT','ความหนาผนัง (ม.)','num']];
+function tSpec(w){
+  const sp = S.spec, QQ = isHouse() ? QUICK : QUICK_C;
+  const fld = ([p,l,t,opts]) => { const v = getPath(sp, p), id = 'q_' + p;
+    if (t === 'bool') return `<select id="${id}" data-q="${p}" data-t="bool"><option value="1" ${v?'selected':''}>ใช่</option><option value="0" ${!v?'selected':''}>ไม่ (ราคา = ต้นทุนตรง)</option></select>`;
+    if (t === 'sel' || t === 'seln') return `<select id="${id}" data-q="${p}" data-t="${t}">${opts.map(([o,txt]) => `<option value="${esc(o)}" ${String(o) === String(v) ? 'selected' : ''}>${esc(txt)}</option>`).join('')}</select>`;
+    if (t === 'auto') return `<input id="${id}" data-q="${p}" data-t="auto" type="text" inputmode="decimal" value="${esc(v)}">`;
+    return `<input id="${id}" data-q="${p}" data-t="${t}" type="${t==='date'?'date':'number'}" step="any" value="${esc(v)}">`; };
+  w.innerHTML = `
+  <div class="panel"><h3>ค่าหลักของโครงการ${isHouse() ? '' : ' — ท่อลอดคลองส่งน้ำ มฐ04-62'}</h3><div class="form">
+    ${QQ.map(q => `<div class="field"><label for="q_${q[0]}">${q[1]}</label>${fld(q)}</div>`).join('')}
+  </div>${isHouse() ? '' : `<p class="note" style="margin-top:10px">ความหนา Ts/Tw และเหล็กเสริมเลือกจากตารางมาตรฐานตามดินถมหลังท่อ hc ที่คำนวณจากระดับคลองโดยอัตโนมัติ · ความยาวท่อ “auto” = ให้สันกำแพงหน้าท่อสูงกว่าผิวลาดคันดิน 0.10 ม.</p>`}</div>
+  <div class="grid2">
+    <div class="panel"><h3>วันหยุดที่ไม่ทำงาน</h3><div class="field"><label for="q_hol">หนึ่งวันต่อบรรทัด (ปปปป-ดด-วว) — วันอาทิตย์หยุดอยู่แล้ว</label><textarea id="q_hol" rows="8">${esc(sp.plan.holidays.join('\n'))}</textarea></div><div class="btnrow" style="margin-top:8px"><button class="btn" data-act="hol">ใช้วันหยุดชุดนี้</button></div></div>
+    <div class="panel"><h3>วันทำงานที่เสียเพราะฝน (% ตามเดือนที่เริ่มกิจกรรม)</h3><div class="form" style="grid-template-columns:repeat(auto-fit,minmax(70px,1fr))">
+      ${sp.plan.weather.map((v,i) => `<div class="field"><label for="wx${i}">${['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'][i]}</label><input id="wx${i}" type="number" step="1" data-wx="${i}" value="${Math.round(v*100)}"></div>`).join('')}</div></div>
+  </div>
+  <div class="panel"><h3>ข้อมูลแบบทั้งหมด (JSON)</h3>
+    <p class="note">กริด ระดับ ฐานราก เสา คาน พื้น บันได หลังคา ผนังและช่องเปิด บล็อกช่องลม วัสดุพื้น/ฝ้า งานระบบ ราคา และกิจกรรม อยู่ในข้อมูลชุดนี้ทั้งหมด แก้แล้วกด “ใช้ข้อมูลนี้” — ถ้ามีข้อผิดพลาด ข้อมูลเดิมจะไม่ถูกแทนที่</p>
+    <div class="btnrow" style="margin-block:8px"><select id="jump" aria-label="ไปที่หัวข้อ"><option value="">ไปที่หัวข้อ…</option>${Object.keys(sp).map(k => `<option>${esc(k)}</option>`).join('')}</select>
+      <button class="btn pri" data-act="applyjson">ใช้ข้อมูลนี้</button><button class="btn" data-act="resetjson">คืนค่าที่ใช้อยู่</button></div>
+    <p class="err" id="jsonerr">${S.err ? esc(S.err) : ''}</p>
+    <textarea class="json" id="json" spellcheck="false" aria-label="ข้อมูลแบบ JSON">${esc(JSON.stringify(sp, null, 1))}</textarea>
+  </div>`;
+}
+
+// ---------------------------------------------------------------- 3D model
+const MATC = {concrete:[196,194,188,1],concrete_dark:[150,148,142,1],steel:[70,110,150,1],wall_ext:[236,230,216,1],wall_int:[245,242,235,1],wall_bath:[200,215,220,1],wood:[140,95,60,1],glass:[150,200,190,.35],breeze:[240,238,232,1],tile_floor:[222,218,210,1],tile_bath:[190,205,210,1],deck:[160,120,85,1],ceiling:[250,250,248,1],roof:[120,120,118,1],roof_clear:[210,230,235,.45],sanitary:[252,252,252,1],pipe:[90,90,90,1],light:[255,240,170,1],panel:[60,60,60,1],ground:[150,175,120,1],lean:[170,168,160,1],riprap:[128,118,104,1],gravel:[188,176,150,1],earth:[176,150,110,.3],lining:[205,203,196,1]};
+const V3 = { renderer:null, scene:null, camera:null, controls:null, groups:{}, meshes:[], hidden:new Set(['Site','A-Ceiling']), box:null, raf:null, host:null };
+function prismOf(p){
+  if (p[0] === 'B') { const [,x0,x1,y0,y1,z0,z1] = p; return { base:[[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0]], d:[0,0,z1-z0] }; }
+  if (p[0] === 'P') { const n = p[2], l = Math.hypot(...n); return { base:p[1], d:n.map(v => v/l*p[3]) }; }
+  const V = H.partVerts(p); return { base:[V[0],V[1],V[3],V[2]], d:[V[4][0]-V[0][0], V[4][1]-V[0][1], V[4][2]-V[0][2]] };
+}
+function pushPrism(arr, col, pr, c){
+  const B = pr.base, T = B.map(q => [q[0]+pr.d[0], q[1]+pr.d[1], q[2]+pr.d[2]]), tri = (a,b,cc) => { arr.push(...a,...b,...cc); col.push(...c,...c,...c); };
+  for (let i = 1; i < B.length - 1; i++) { tri(B[0], B[i+1], B[i]); tri(T[0], T[i], T[i+1]); }
+  for (let i = 0; i < B.length; i++) { const j = (i+1) % B.length; tri(B[i], B[j], T[j]); tri(B[i], T[j], T[i]); }
+}
+function buildScene(){
+  const THREE = window.THREE; if (!THREE || !V3.scene) return;
+  for (const g of Object.values(V3.groups)) V3.scene.remove(g);
+  V3.groups = {}; V3.meshes = [];
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x2a2f2d, transparent: true, opacity: 0.28 });
+  S.R.E.forEach((e, idx) => {
+    const op = { v:[], c:[] }, tr = { v:[], c:[] };
+    for (const p of e.parts) { const m = MATC[p[p.length-1]] || [200,200,200,1]; pushPrism(m[3] < 1 ? tr.v : op.v, m[3] < 1 ? tr.c : op.c, prismOf(p), [m[0]/255, m[1]/255, m[2]/255]); }
+    const grp = V3.groups[e.tag] || (V3.groups[e.tag] = new THREE.Group());
+    for (const [buf, transp] of [[op,false],[tr,true]]) {
+      if (!buf.v.length) continue;
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(buf.v, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(buf.c, 3)); geo.computeVertexNormals();
+      const mat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: transp, opacity: transp ? 0.4 : 1, depthWrite: !transp });
+      const mesh = new THREE.Mesh(geo, mat); mesh.userData.idx = idx; grp.add(mesh); V3.meshes.push(mesh);
+      if (!transp && e.parts.length < 60) { const ln = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), lineMat); grp.add(ln); }
+    }
+  });
+  for (const [t, g] of Object.entries(V3.groups)) { g.visible = !V3.hidden.has(t); V3.scene.add(g); }
+  V3.viewVer = S.geomVer; select(null);
+}
+function initViewer(host){
+  const THREE = window.THREE;
+  if (!THREE || !THREE.OrbitControls) { host.innerHTML = '<div class="empty">โหลดตัวแสดงผล 3D ไม่ได้ (three.js)</div>'; return; }
+  if (!V3.renderer) {
+    V3.renderer = new THREE.WebGLRenderer({ antialias: true }); V3.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    V3.scene = new THREE.Scene();
+    V3.camera = new THREE.PerspectiveCamera(40, 1, 0.1, 500); V3.camera.up.set(0, 0, 1);
+    V3.scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f8c, 0.85));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.55); dl.position.set(-20, -30, 40); V3.scene.add(dl);
+    V3.controls = new THREE.OrbitControls(V3.camera, V3.renderer.domElement); V3.controls.enableDamping = true;
+    V3.renderer.domElement.addEventListener('click', pick);
+    const loop = () => { V3.raf = requestAnimationFrame(loop); V3.controls.update(); V3.renderer.render(V3.scene, V3.camera); }; loop();
+    V3.ro = new ResizeObserver(() => sizeViewer());
+  }
+  V3.host = host; host.prepend(V3.renderer.domElement); V3.ro.disconnect(); V3.ro.observe(host);
+  V3.scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--scene').trim() || '#e9edec');
+  if (V3.viewVer !== S.geomVer) { const t = S.spec.type || 'house'; buildScene(); if (V3.lastType !== t) { V3.lastType = t; setView('iso'); } }
+  sizeViewer();
+}
+function sizeViewer(){ if (!V3.host || !V3.renderer) return; const r = V3.host.getBoundingClientRect(); if (!r.width) return; V3.renderer.setSize(r.width, r.height, false); V3.camera.aspect = r.width / r.height; V3.camera.updateProjectionMatrix(); }
+function setView(v){
+  let lo = [1e9,1e9,1e9], hi = [-1e9,-1e9,-1e9];
+  if (S.spec.grid) { const gx = Object.values(S.spec.grid.x), gy = Object.values(S.spec.grid.y); lo = [Math.min(...gx), Math.min(...gy), 0]; hi = [Math.max(...gx), Math.max(...gy), 3]; }
+  else if (S.R) for (const e of S.R.E) { if (e.tag === 'Site' || e.tag === 'C-Earth') continue; const [a, b] = H.elemBBox(e); lo = lo.map((q,i) => Math.min(q, a[i])); hi = hi.map((q,i) => Math.max(q, b[i])); }
+  if (lo[0] > hi[0]) { lo = [0,0,0]; hi = [10,10,3]; }
+  const cx = (lo[0]+hi[0])/2, cy = (lo[1]+hi[1])/2, cz = S.spec.grid ? 1.5 : (lo[2]+hi[2])/2, R = Math.max(hi[0]-lo[0], hi[1]-lo[1]) * (S.spec.grid ? 1 : 0.55);
+  const P = { iso:[cx - R*1.1, cy - R*1.2, cz + R*0.9], top:[cx, cy - 0.001, cz + R*2.2], south:[cx, cy - R*1.9, cz + 1], north:[cx, cy + R*1.9, cz + 1] }[v];
+  V3.camera.position.set(...P); V3.controls.target.set(cx, cy, cz); V3.controls.update();
+}
+function pick(ev){
+  const THREE = window.THREE, r = V3.renderer.domElement.getBoundingClientRect();
+  const m = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  const rc = new THREE.Raycaster(); rc.setFromCamera(m, V3.camera);
+  const hit = rc.intersectObjects(V3.meshes.filter(o => o.parent.visible), false)[0];
+  select(hit ? hit.object.userData.idx : null);
+}
+function select(idx){
+  const THREE = window.THREE; S.sel = idx;
+  if (V3.box) { V3.scene.remove(V3.box); V3.box = null; }
+  const info = document.getElementById('info'); if (!info) return;
+  if (idx == null) { info.classList.add('hide'); return; }
+  const e = S.R.E[idx], [lo, hi] = H.elemBBox(e);
+  V3.box = new THREE.Box3Helper(new THREE.Box3(new THREE.Vector3(...lo), new THREE.Vector3(...hi)), 0xd4372b); V3.scene.add(V3.box);
+  const vol = e.parts.reduce((s, p) => s + H.partVolume(p), 0);
+  info.classList.remove('hide');
+  info.innerHTML = `<h4>${esc(e.name)}</h4><dl><dt>IFC</dt><dd>${esc(e.ifc)}</dd><dt>Mark</dt><dd>${esc(e.mark)}</dd><dt>Tag</dt><dd>${esc(e.tag)}</dd><dt>ปริมาตร</dt><dd>${vol.toFixed(3)} ลบ.ม.</dd><dt>ขอบเขต</dt><dd>x ${lo[0].toFixed(2)}–${hi[0].toFixed(2)}, y ${lo[1].toFixed(2)}–${hi[1].toFixed(2)}, z ${lo[2].toFixed(2)}–${hi[2].toFixed(2)}</dd>
+    ${Object.entries(e.attrs).map(([k,v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl><div class="btnrow" style="margin-top:8px"><button class="btn" data-act="unsel">ปิด</button></div>`;
+}
+function tModel(w){
+  const tags = [...new Set(S.R.E.map(e => e.tag))].sort();
+  w.innerHTML = `<div class="panel"><div class="vtools">
+    <span class="eyebrow">มุมมอง</span>${(isHouse() ? [['iso','ไอโซ'],['top','แปลน'],['south','ด้านใต้'],['north','ด้านเหนือ']] : [['iso','ไอโซ'],['top','แปลน'],['south','รูปตัดตามยาว'],['north','ด้านตรงข้าม']]).map(([v,t]) => `<button class="btn" data-view="${v}">${t}</button>`).join('')}
+    <span class="eyebrow" style="margin-left:6px">Tag</span>${tags.map(t => `<label><input type="checkbox" data-tag="${esc(t)}" ${V3.hidden.has(t)?'':'checked'}>${esc(t)}</label>`).join('')}
+  </div></div>
+  <div class="viewer" id="viewer"><div class="info hide" id="info"></div></div>
+  <p class="note">ลากเพื่อหมุน · เลื่อนล้อเพื่อซูม · คลิกขวาลากเพื่อเลื่อน · คลิกชิ้นส่วนเพื่อดูข้อมูล</p>`;
+  initViewer(document.getElementById('viewer'));
+  if (S.sel != null) select(S.sel);
+}
+
+// ---------------------------------------------------------------- checks
+function tCheck(w){
+  const R = S.R, B = R.BQ, SC = R.SC, ids = new Set(SC.acts.map(a => a.id));
+  const sumW = SC.W.reduce((s, r) => s + r.value, 0), actV = SC.acts.reduce((s, a) => s + a.value, 0);
+  const rows = [
+    ['ราคารวม BOQ×F = ผลรวมมูลค่ากิจกรรม', B.total, actV],
+    ['ผลรวมกิจกรรม = ผลรวม S-Curve ทุกสัปดาห์', actV, sumW],
+    ...B.cats.map(c => [`S-Curve ${c.title} = BOQ หมวดนั้น × F`, c.total * B.F, SC.catTot[c.code]]),
+  ];
+  const orphan = B.rows.filter(r => !ids.has(r.act)), zero = B.rows.filter(r => !(r.base > 0));
+  const nocost = SC.acts.filter(a => !a.direct);
+  const dc = R.TO.checks ? `<div class="panel checks"><h3>ตรวจเงื่อนไขแบบมาตรฐาน</h3><div class="scroll"><table><thead><tr><th>รายการ</th><th class="n">ค่าที่ได้</th><th>เกณฑ์</th><th>ผล</th></tr></thead><tbody>
+    ${R.TO.checks.map(c => `<tr><td>${esc(c.item)}</td><td class="n">${esc(c.val)}</td><td>${esc(c.lim)}</td><td>${c.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill crit">ไม่ผ่าน</span> <span class="note">' + esc(c.note) + '</span>'}</td></tr>`).join('')}</tbody></table></div></div>` : '';
+  w.innerHTML = dc + `
+  <div class="panel"><h3>ตรวจการชนกันของชิ้นส่วน</h3>
+    <p class="note">ทดสอบจุดตัวอย่างภายในรูปทรงจริง (ใช้ได้กับชิ้นส่วนลาดเอียง) — ${isHouse() ? 'ไม่รวมรอยต่อโครงสร้างกับโครงสร้าง ท่อกับบ่อพัก และพื้นดินอ้างอิง' : 'ตรวจทุกชิ้นส่วนโครงสร้าง คอนกรีตหยาบ หินเรียง และกรวด — ไม่รวมดินคันคลอง ดาดคลอง และพื้นดินอ้างอิงซึ่งเป็นบริบท'}</p>
+    <div class="btnrow" style="margin-block:8px"><button class="btn pri" data-act="clash">ตรวจการชน</button></div>
+    <div id="clashres">${clashTable()}</div></div>
+  <div class="panel checks"><h3>ความสอดคล้อง BOQ ↔ แผนงาน ↔ S-Curve</h3><div class="scroll"><table><thead><tr><th>รายการตรวจ</th><th class="n">ค่า A</th><th class="n">ค่า B</th><th class="n">ผลต่าง</th><th>ผล</th></tr></thead><tbody>
+    ${rows.map(([t,a,b]) => `<tr><td>${esc(t)}</td><td class="n">${fmt(a,2)}</td><td class="n">${fmt(b,2)}</td><td class="n">${fmt(a-b,2)}</td><td>${Math.abs(a-b) < 0.5 ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill crit">ไม่ผ่าน</span>'}</td></tr>`).join('')}
+    <tr><td>รายการ BOQ ที่รหัสกิจกรรมไม่มีในแผนงาน</td><td class="n">${orphan.length}</td><td class="n">0</td><td></td><td>${orphan.length ? '<span class="pill crit">ไม่ผ่าน</span> ' + esc(orphan.map(r => r.no).join(', ')) : '<span class="pill ok">ผ่าน</span>'}</td></tr>
+    <tr><td>รายการ BOQ ที่ปริมาณเป็นศูนย์</td><td class="n">${zero.length}</td><td></td><td></td><td>${zero.length ? '<span class="pill warn">ตรวจดู</span> ' + esc(zero.map(r => r.no).join(', ')) : '<span class="pill ok">ไม่มี</span>'}</td></tr>
+    <tr><td>กิจกรรมที่ไม่มีต้นทุน (เช่น บ่มคอนกรีต)</td><td class="n">${nocost.length}</td><td></td><td></td><td class="note">${esc(nocost.map(a => a.id).join(', '))}</td></tr>
+    </tbody></table></div></div>`;
+}
+function clashTable(){
+  if (!S.clash) return '<p class="note">ยังไม่ได้ตรวจ</p>';
+  if (!S.clash.length) return '<p><span class="pill ok">ไม่พบการชน</span></p>';
+  return `<div class="scroll"><table><thead><tr><th>ชิ้นส่วน A</th><th>ชิ้นส่วน B</th><th class="n">จุดที่ซ้อน</th><th></th></tr></thead><tbody>${S.clash.slice(0,200).map(c => `<tr><td>${esc(c.a)}</td><td>${esc(c.b)}</td><td class="n">${c.n}</td><td><button class="btn" data-show="${c.ia}">ดูในโมเดล</button></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+// ---------------------------------------------------------------- takeoff
+function tQto(w){
+  const Q = S.R.TO.Q, keys = Object.keys(Q);
+  const TO = S.R.TO;
+  const pre = TO.design ? `<div class="grid2"><div class="panel"><h3>ค่าที่ใช้จากแบบมาตรฐาน</h3><div class="scroll"><table><tbody>${TO.design.map(([k,v]) => `<tr><td style="white-space:nowrap">${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table></div></div>
+    <div class="panel"><h3>เหล็กเสริมแยกขนาด (ไม่รวมเผื่อ)</h3><div class="scroll"><table><thead><tr><th>ขนาด</th><th class="n">น้ำหนัก (กก.)</th><th class="n">ความยาว (ม.)</th></tr></thead><tbody>${TO.rebarByDia.map(r => `<tr><td>DB${r.d}</td><td class="n">${fmt(r.kg)}</td><td class="n">${fmt(r.kg / ({10:.617,12:.888,16:1.578,20:2.466}[r.d]||1))}</td></tr>`).join('')}
+    <tr class="tot"><td>รวม</td><td class="n">${fmt(TO.rebarByDia.reduce((a,r) => a + r.kg, 0))}</td><td></td></tr></tbody></table></div><p class="note">ระยะเรียงจากตารางมาตรฐาน ความยาวเหล็กแต่ละตัวประมาณจากรูปตัด — ใช้ประมาณราคา ไม่ใช่ bar schedule</p></div></div>` : '';
+  w.innerHTML = pre + `<div class="panel"><h3>ถอดปริมาณจากโมเดล</h3><p class="note">ปริมาณสุทธิ (ยังไม่รวมเผื่อ) — รายการที่ช่องเป็นสีน้ำเงินเป็นปริมาณนับ/ประมาณที่ไม่ได้มาจากรูปทรง แก้ได้</p>
+  <div class="scroll"><table><thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th><th class="n">ปริมาณ</th><th>ที่มา</th></tr></thead><tbody>
+  ${keys.map(k => { const q = Q[k]; return `<tr><td class="n" style="text-align:left">${esc(k)}</td><td>${esc(q.desc)}</td><td>${esc(q.unit)}</td><td class="n">${q.manual ? `<input type="number" step="any" data-mq="${esc(k)}" value="${q.qty}" aria-label="ปริมาณ ${esc(k)}">` : fmt(q.qty, 2)}</td><td class="basis">${esc(q.basis)}</td></tr>`; }).join('')}
+  </tbody></table></div></div>
+  ${S.R.TO.openings.length ? '' : '<!--'}<div class="panel"><h3>ประตู-หน้าต่าง</h3><div class="scroll"><table><thead><tr><th>รหัส</th><th>ชนิด</th><th>กลุ่มราคา</th><th class="n">จำนวน</th><th class="n">ขนาด (ม.)</th><th class="n">พื้นที่รวม (ตร.ม.)</th></tr></thead><tbody>
+  ${S.R.TO.openings.map(o => `<tr><td>${esc(o.mark)}</td><td>${esc(o.desc)}</td><td>${esc(o.group)}</td><td class="n">${o.count}</td><td class="n">${esc(o.size)}</td><td class="n">${fmt(o.count*o.area,2)}</td></tr>`).join('')}
+  </tbody></table></div></div>${S.R.TO.openings.length ? '' : '-->'}`;
+}
+
+// ---------------------------------------------------------------- BOQ
+function tBoq(w){
+  const B = S.R.BQ;
+  let h = `<div class="panel"><h3>บัญชีปริมาณวัสดุและราคา</h3><p class="note">แก้ค่าวัสดุ/ค่าแรงต่อหน่วย เผื่อ % และรหัสกิจกรรมได้ในตาราง — ราคาตั้งต้นเป็นค่าประมาณ ไม่ใช่ราคากลางทางราชการ</p><div class="scroll"><table>
+  <thead><tr><th>ลำดับ</th><th>รายการ</th><th>หน่วย</th><th class="n">ปริมาณสุทธิ</th><th class="n">เผื่อ %</th><th class="n">ปริมาณรวม</th><th class="n">วัสดุ/หน่วย</th><th class="n">แรง/หน่วย</th><th class="n">ค่าวัสดุ</th><th class="n">ค่าแรง</th><th class="n">รวม (บาท)</th><th>กิจกรรม</th></tr></thead><tbody>`;
+  B.cats.forEach((c, ci) => {
+    h += `<tr class="cat"><td colspan="12"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${catC(c.code)};margin-right:6px"></i>${esc(c.title)}</td></tr>`;
+    c.subs.forEach((sb, si) => {
+      h += `<tr class="sub"><td colspan="12">${esc(sb.title)}</td></tr>`;
+      sb.rows.forEach((r, ii) => {
+        const p = `${ci}.${si}.${ii}`;
+        h += `<tr><td class="n" style="text-align:left">${esc(r.no)}</td><td>${esc(r.desc)}</td><td>${esc(r.unit)}</td><td class="n">${fmt(r.base,2)}</td>
+          <td class="n"><input class="w" type="number" step="any" data-boq="${p}.waste" value="${r.waste}" aria-label="เผื่อ"></td><td class="n">${fmt(r.qty,2)}</td>
+          <td class="n"><input type="number" step="any" data-boq="${p}.mat" value="${r.rMat}" aria-label="ค่าวัสดุต่อหน่วย"></td><td class="n"><input type="number" step="any" data-boq="${p}.lab" value="${r.rLab}" aria-label="ค่าแรงต่อหน่วย"></td>
+          <td class="n">${fmt(r.mat)}</td><td class="n">${fmt(r.lab)}</td><td class="n">${fmt(r.total)}</td><td><input class="w" style="text-align:left" data-boq="${p}.act" value="${esc(r.act)}" aria-label="กิจกรรม"></td></tr>`;
+      });
+      h += `<tr class="tot"><td></td><td>รวม ${esc(sb.title)}</td><td colspan="6"></td><td class="n">${fmt(sb.mat)}</td><td class="n">${fmt(sb.lab)}</td><td class="n">${fmt(sb.total)}</td><td></td></tr>`;
+    });
+    h += `<tr class="cat"><td></td><td>รวม${esc(c.title)}</td><td colspan="6"></td><td class="n">${fmt(c.mat)}</td><td class="n">${fmt(c.lab)}</td><td class="n">${fmt(c.total)}</td><td></td></tr>`;
+  });
+  h += `<tr class="tot"><td></td><td>รวมต้นทุนตรง</td><td colspan="6"></td><td class="n">${fmt(B.mat)}</td><td class="n">${fmt(B.lab)}</td><td class="n">${fmt(B.direct)}</td><td></td></tr>
+        <tr class="tot"><td></td><td>Factor F ${B.F.toFixed(4)} → ราคารวม</td><td colspan="8"></td><td class="n">${fmt(B.total)}</td><td></td></tr></tbody></table></div></div>`;
+  w.innerHTML = h;
+}
+
+// ---------------------------------------------------------------- plan
+function tPlan(w){
+  const SC = S.R.SC;
+  w.innerHTML = `<div class="panel"><h3>กิจกรรมและความสัมพันธ์</h3>
+  <p class="note">ระยะเวลา = ปริมาณจาก BOQ ÷ (ผลิตภาพ × ทีม) หรือวันคงที่ แล้วเผื่อวันฝนตามเดือนที่เริ่ม · ก่อนหน้าเขียนเป็น <b>รหัส:lag</b> คั่นด้วยจุลภาค (lag 0 = เริ่มวันทำการถัดไป, ค่าลบ = เริ่มซ้อน) · วันอาทิตย์และวันหยุดไม่นับ</p>
+  <div class="scroll"><table><thead><tr><th>รหัส</th><th>กิจกรรม</th><th class="n">ปริมาณ</th><th class="n">ผลิตภาพ/ทีม-วัน</th><th class="n">ทีม</th><th class="n">วันคงที่</th><th class="n">ฝน</th><th class="n">วันทำการ</th><th>ก่อนหน้า</th><th>เริ่ม</th><th>เสร็จ</th><th class="n">Float</th><th class="n">มูลค่า ×F</th></tr></thead><tbody>
+  ${SC.acts.map((a, i) => `<tr><td>${esc(a.id)}</td><td>${esc(a.name)}</td><td class="n">${a.qty == null ? '–' : fmt(a.qty,1)}</td>
+    <td class="n"><input class="w" type="number" step="any" data-act-e="${i}.prod" value="${a.ref.prod ?? ''}" aria-label="ผลิตภาพ"></td><td class="n"><input class="w" type="number" step="1" data-act-e="${i}.crews" value="${a.ref.crews ?? ''}" aria-label="ทีม"></td>
+    <td class="n"><input class="w" type="number" step="1" data-act-e="${i}.fixed" value="${a.ref.fixed ?? ''}" aria-label="วันคงที่"></td><td class="n">${Math.round(a.weather*100)}%</td><td class="n">${a.dur}</td>
+    <td><input class="t" data-act-e="${i}.preds" value="${esc(a.preds.map(([p,l]) => p + ':' + l).join(', '))}" aria-label="ก่อนหน้า"></td>
+    <td>${esc(a.stISO.slice(5))}</td><td>${esc(a.finISO.slice(5))}</td><td class="n">${a.critical ? '<span class="pill crit">วิกฤต</span>' : a.float}</td><td class="n">${fmt(a.value)}</td></tr>`).join('')}
+  </tbody></table></div></div>
+  <div class="panel"><h3>แผนภูมิแกนต์รายสัปดาห์</h3><div class="legend"><span><i style="background:var(--crit)"></i>สายงานวิกฤต</span><span><i style="background:var(--gantt)"></i>มี float</span></div><div class="scroll">${ganttSVG(SC)}</div></div>`;
+}
+
+// ---------------------------------------------------------------- S-curve
+function tScurve(w){
+  const SC = S.R.SC, cats = Object.keys(SC.catTot);
+  w.innerHTML = `<div class="panel"><h3>S-Curve ความก้าวหน้าสะสม</h3>
+    <div class="legend"><span><i style="background:var(--accent);height:4px"></i>รวมทุกหมวด</span>${cats.map(c => `<span><i style="background:${catC(c)}"></i>${catN(c)} (สะสม % ของหมวด)</span>`).join('')}<span><i style="background:var(--accent-soft);height:8px"></i>มูลค่ารายสัปดาห์</span></div>
+    ${scurveSVG(SC, 960, 340, true)}</div>
+  <div class="panel"><h3>ตาราง S-Curve รายสัปดาห์ (บาท รวม Factor F)</h3><div class="scroll"><table><thead><tr><th class="n">สัปดาห์</th><th>เริ่ม</th>${cats.map(c => `<th class="n">${catN(c)}</th>`).join('')}<th class="n">รวมสัปดาห์</th><th class="n">สะสม</th><th class="n">สะสม %</th></tr></thead><tbody>
+    ${SC.W.map(r => `<tr><td class="n">${r.week}</td><td>${thDate(r.ws)}</td>${cats.map(c => `<td class="n">${fmt(r.byCat[c])}</td>`).join('')}<td class="n">${fmt(r.value)}</td><td class="n">${fmt(r.cum)}</td><td class="n">${(r.pct*100).toFixed(1)}</td></tr>`).join('')}
+    <tr class="tot"><td></td><td>รวม</td>${cats.map(c => `<td class="n">${fmt(SC.catTot[c])}</td>`).join('')}<td class="n">${fmt(SC.W.at(-1).cum)}</td><td></td><td></td></tr></tbody></table></div></div>`;
+}
+
+// ---------------------------------------------------------------- export
+function tExport(w){
+  const ok = !!S.dl, fn = (S.name || 'house').replace(/[^\w\u0E00-\u0E7F-]+/g, '_').slice(0, 60);
+  w.innerHTML = `<div class="grid2">
+   <div class="panel"><h3>Excel: BOQ + แผนงาน + S-Curve</h3><p class="note">แผ่น Summary, BOQ (มีสูตรปริมาณรวมและยอดเงิน), Takeoff, ${isHouse() ? 'Openings' : 'Design'}, Schedule, S-Curve</p><button class="btn pri" data-exp="xlsx" ${ok?'':'disabled'}>ดาวน์โหลด ${esc(fn)}_BOQ_Plan.xlsx</button></div>
+   <div class="panel"><h3>สคริปต์ SketchUp (Ruby)</h3><p class="note">ได้ไฟล์ .rb.txt (ระบบอนุญาตเฉพาะนามสกุล .txt) — ใน Ruby Console พิมพ์ <code>load 'C:/path/${esc(fn)}_BIM.rb.txt'</code> แล้ว <code>${rbModule()}.build</code> ใช้ได้ทันทีโดยไม่ต้องเปลี่ยนชื่อไฟล์</p><button class="btn pri" data-exp="rb" ${ok?'':'disabled'}>ดาวน์โหลดสคริปต์ (${S.R.E.length} ชิ้น)</button></div>
+   <div class="panel"><h3>ไฟล์โครงการ (JSON)</h3><p class="note">ข้อมูลแบบทั้งชุด — เก็บสำรอง หรือส่งให้ Claude ช่วยแก้/สร้างโครงการใหม่ แล้วนำเข้ากลับ</p><button class="btn" data-exp="json" ${ok?'':'disabled'}>ดาวน์โหลด ${esc(fn)}.json</button></div>
+   <div class="panel"><h3>ตารางถอดปริมาณ (CSV)</h3><p class="note">เปิดใน Excel ได้ (UTF-8)</p><button class="btn" data-exp="csv" ${ok?'':'disabled'}>ดาวน์โหลด ${esc(fn)}_takeoff.csv</button></div>
+  </div>${ok ? '' : '<p class="note">การดาวน์โหลดใช้ได้เมื่อเปิดหน้านี้ใน claude.ai</p>'}`;
+}
+function doExport(kind){
+  const fn = (S.name || 'house').replace(/[^\w\u0E00-\u0E7F-]+/g, '_').slice(0, 60), R = S.R;
+  if (kind === 'json') return offer(fn + '.json', JSON.stringify(Object.assign(clone(S.spec), { name: S.name }), null, 1));
+  if (kind === 'rb') return offer(fn + '_BIM.rb.txt', H.rubyScript(Object.assign({}, S.spec, { name: S.name }), R.E, RBT));
+  if (kind === 'csv') { const rows = [['key','description','unit','qty','basis']].concat(Object.values(R.TO.Q).map(q => [q.key, q.desc, q.unit, q.qty, q.basis]));
+    return offer(fn + '_takeoff.csv', '\uFEFF' + rows.map(r => r.map(v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g,'""') + '"' : v).join(',')).join('\n')); }
+  if (kind === 'xlsx') { const X = window.XLSX; if (!X) return alertBox('โหลดไลบรารี Excel ไม่ได้'); return offer(fn + '_BOQ_Plan.xlsx', buildXlsx(X, R)); }
+}
+function buildXlsx(X, R){
+  const wb = X.utils.book_new(), B = R.BQ, SC = R.SC, sp = S.spec;
+  const add = (name, aoa, cols, extra) => { const ws = X.utils.aoa_to_sheet(aoa); ws['!cols'] = cols.map(w => ({ wch: w })); if (extra) extra(ws); X.utils.book_append_sheet(wb, ws, name); };
+  add('Summary', [[S.name], ['ประมาณการเบื้องต้นจากโมเดล — ราคาต่อหน่วยและ Factor F เป็นค่าประมาณ ตรวจสอบก่อนใช้'], [],
+    ['หมวดงาน','ค่าวัสดุ','ค่าแรง','ต้นทุนตรง','สัดส่วน'], ...B.cats.map(c => [c.title, c.mat, c.lab, c.total, c.total/B.direct]),
+    ['รวมต้นทุนตรง', B.mat, B.lab, B.direct, 1], ['Factor F', B.F], ['ราคารวม', B.total], ['บาท/' + perUnit().label, perUnit().qty ? B.total/perUnit().qty : ''], ['ประมาณการอ้างอิง', sp.meta.refEstimate || ''], [],
+    ['วันเริ่ม', SC.start], ['วันแล้วเสร็จ', SC.end], ['วันปฏิทิน', SC.days], ['วันทำการ', SC.workdays], ['สัปดาห์', SC.weeks], [],
+    ['งวด','สิ้นสัปดาห์ที่','วันที่','สะสม %','มูลค่าสะสม'], ...milestones(SC).map(m => ['งวดที่ ' + m.k, m.week, m.date, m.pct, m.cum])], [34,16,16,16,12]);
+  // BOQ with live formulas for qty and money
+  const aoa = [['ลำดับ','รายการ','หน่วย','ปริมาณสุทธิ','เผื่อ','ปริมาณรวม','วัสดุ/หน่วย','แรง/หน่วย','ค่าวัสดุ','ค่าแรง','รวม','กิจกรรม','หมวด','หมายเหตุ']];
+  const fr = [];
+  B.cats.forEach(c => { aoa.push([c.title]); c.subs.forEach(sb => { aoa.push(['', sb.title]); const r0 = aoa.length + 1;
+    sb.rows.forEach(r => { const i = aoa.length + 1; aoa.push([r.no, r.desc, r.unit, r.base, r.waste/100, r.qty, r.rMat, r.rLab, r.mat, r.lab, r.total, r.act, r.cat, r.note]); fr.push(i); });
+    aoa.push(['', 'รวม ' + sb.title, '', '', '', '', '', '', sb.mat, sb.lab, sb.total]); fr.push(['sum', aoa.length, r0, aoa.length - 1]); }); });
+  aoa.push([], ['', 'รวมต้นทุนตรง', '', '', '', '', '', '', B.mat, B.lab, B.direct], ['', 'Factor F', '', '', '', '', '', '', '', '', B.F], ['', 'ราคารวม', '', '', '', '', '', '', '', '', B.total]);
+  add('BOQ', aoa, [8,52,7,12,7,12,11,11,13,13,14,8,6,50], ws => {
+    for (const f of fr) {
+      if (Array.isArray(f)) { const [, r, a, b] = f; for (const col of ['I','J','K']) ws[col + r] = { t:'n', v: ws[col + r].v, f: `SUM(${col}${a}:${col}${b})` }; continue; }
+      ws['F' + f].f = `D${f}*(1+E${f})`; ws['I' + f].f = `F${f}*G${f}`; ws['J' + f].f = `F${f}*H${f}`; ws['K' + f].f = `I${f}+J${f}`; ws['E' + f].z = '0%';
+    }
+  });
+  add('Takeoff', [['รหัส','รายการ','หน่วย','ปริมาณ','ที่มา'], ...Object.values(R.TO.Q).map(q => [q.key, q.desc, q.unit, q.qty, q.basis])], [10,56,8,12,70]);
+  if (R.TO.design) add('Design', [['รายการ','ค่า'], ...R.TO.design, [], ['ตรวจเงื่อนไข','ค่าที่ได้','เกณฑ์','ผล'], ...R.TO.checks.map(c => [c.item, c.val, c.lim, c.ok ? 'ผ่าน' : 'ไม่ผ่าน']), [], ['เหล็กเสริม','กก.'], ...R.TO.rebarByDia.map(r => ['DB' + r.d, r.kg])], [44, 90, 16, 10]);
+  if (R.TO.openings.length) add('Openings', [['รหัส','ชนิด','กลุ่ม','จำนวน','ขนาด','พื้นที่/ชุด','พื้นที่รวม'], ...R.TO.openings.map(o => [o.mark, o.desc, o.group, o.count, o.size, o.area, o.count*o.area])], [8,44,12,8,12,12,12]);
+  add('Schedule', [['รหัส','กิจกรรม','ปริมาณ','ผลิตภาพ','ทีม','วันคงที่','ฝน','วันทำการ','ก่อนหน้า','เริ่ม','เสร็จ','Float','วิกฤต','ต้นทุนตรง','มูลค่า ×F', ...Object.keys(SC.catTot).map(c => (catN(c)) + ' ×F')],
+    ...SC.acts.map(a => [a.id, a.name, a.qty, a.ref.prod, a.ref.crews, a.ref.fixed, a.weather, a.dur, a.preds.map(([p,l]) => p+':'+l).join(', '), a.stISO, a.finISO, a.float, a.critical ? 'วิกฤต' : '', a.direct, a.value, ...Object.keys(SC.catTot).map(c => a.byCat[c] || 0)])], [6,44,10,9,6,8,6,8,18,11,11,7,7,13,13,12,12,12,12]);
+  const cats = Object.keys(SC.catTot);
+  add('S-Curve', [['สัปดาห์','เริ่ม','สิ้นสุด', ...cats.map(c => catN(c)), 'รวมสัปดาห์','สะสม','สะสม %', ...cats.map(c => (catN(c)) + ' สะสม %')],
+    ...SC.W.map(r => [r.week, r.ws, r.we, ...cats.map(c => r.byCat[c]), r.value, r.cum, r.pct, ...cats.map(c => r.cumCatPct[c])])], [8,11,11,13,13,13,13,13,14,10,12,12,12,12]);
+  return X.write(wb, { type: 'array', bookType: 'xlsx' });
+}
+
+// ---------------------------------------------------------------- events
+document.addEventListener('click', ev => {
+  const t = ev.target.closest('[data-tab],[data-open],[data-view],[data-act],[data-show],[data-exp]'); if (!t) return;
+  if (t.dataset.tab) { S.tab = t.dataset.tab; try { localStorage.setItem('hbs.tab', S.tab); } catch (e) {} renderTab(); return; }
+  if (t.dataset.open) { openProject(t.dataset.open); return; }
+  if (t.dataset.view) { setView(t.dataset.view); return; }
+  if (t.dataset.exp) { doExport(t.dataset.exp); return; }
+  if (t.dataset.show != null) { S.tab = 'model'; S.sel = Number(t.dataset.show); renderTab(); return; }
+  const a = t.dataset.act;
+  if (a === 'unsel') select(null);
+  if (a === 'clash') { t.disabled = true; t.textContent = 'กำลังตรวจ…'; setTimeout(() => { S.clash = H.clashes(S.R.E); renderTop(); renderTab(); }, 20); }
+  if (a === 'applyjson') {
+    let sp; try { sp = JSON.parse($('#json').value); H.run(sp); } catch (e) { $('#jsonerr').textContent = 'ใช้ไม่ได้: ' + (e.message || e); return; }
+    S.spec = sp; if (sp.name) { S.name = sp.name; $('#pname').value = S.name; } touch(); }
+  if (a === 'resetjson') renderTab();
+  if (a === 'hol') { S.spec.plan.holidays = $('#q_hol').value.split(/\s+/).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x)); touch(false); }
+});
+document.addEventListener('change', ev => {
+  const t = ev.target, d = t.dataset;
+  if (d.tag != null) { t.checked ? V3.hidden.delete(d.tag) : V3.hidden.add(d.tag); if (V3.groups[d.tag]) V3.groups[d.tag].visible = t.checked; return; }
+  if (d.q) { let v = t.value; if (d.t === 'num' || d.t === 'seln') v = Number(v); if (d.t === 'bool') v = v === '1'; if ((d.t === 'num' || d.t === 'seln') && isNaN(v)) return;
+    if (d.t === 'auto') { v = v.trim().toLowerCase(); if (v === '' || v === 'auto') v = 'auto'; else { v = Number(v); if (!(v > 0)) return; } } setPath(S.spec, d.q, v); touch(!/^plan|^meta/.test(d.q)); return; }
+  if (d.wx != null) { S.spec.plan.weather[Number(d.wx)] = Math.min(0.9, Math.max(0, Number(t.value) / 100)); touch(false); return; }
+  if (d.mq) { S.spec.manualQty[d.mq].qty = Number(t.value) || 0; touch(false); return; }
+  if (d.boq) { const [ci, si, ii, f] = d.boq.split('.'); const it = S.spec.boq[ci].subs[si].items[ii]; it[f] = f === 'act' ? t.value.trim() : Number(t.value) || 0; touch(false); return; }
+  if (d.actE) { const [i, f] = d.actE.split('.'); const a = S.spec.activities[Number(i)];
+    if (f === 'preds') a.preds = t.value.split(',').map(x => x.trim()).filter(Boolean).map(x => { const [p, l] = x.split(':'); return [p.trim(), Number(l || 0)]; });
+    else a[f] = t.value === '' ? null : Number(t.value);
+    touch(false); return; }
+  if (t.id === 'jump') { const ta = $('#json'), i = ta.value.indexOf('"' + t.value + '"'); if (i >= 0) { ta.focus(); ta.setSelectionRange(i, i); const lines = ta.value.slice(0, i).split('\n').length; ta.scrollTop = (lines - 3) * 16; } return; }
+});
+$('#pname').addEventListener('change', e => { S.name = e.target.value.trim() || 'โครงการ'; S.dirty = true; scheduleSave(); renderProjects(); });
+$('#bSave').addEventListener('click', save);
+for (const b of ['#bNew', '#bNewC']) $(b).addEventListener('click', ev => { const T = TEMPLATES[ev.currentTarget.dataset.tpl]; S.spec = clone(T); S.id = null; S.name = T.name + ' (สำเนาใหม่)'; S.dirty = true; S.sel = null; $('#pname').value = S.name; renderProjects(); recompute(); setStatus(); });
+$('#bDup').addEventListener('click', () => { S.id = null; S.name = S.name + ' (สำเนา)'; S.dirty = true; $('#pname').value = S.name; renderProjects(); setStatus(); });
+$('#bDel').addEventListener('click', async ev => {
+  const b = ev.currentTarget; if (!S.db || !S.id) return;
+  if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'กดอีกครั้งเพื่อยืนยันการลบ'; setTimeout(() => { b.dataset.armed = ''; b.textContent = 'ลบ'; }, 4000); return; }
+  b.dataset.armed = ''; b.textContent = 'ลบ';
+  await S.db.doc('projects/' + S.id).delete(); S.id = null; S.dirty = true; setStatus(); renderProjects();
+});
+$('#fImport').addEventListener('change', ev => {
+  const f = ev.target.files[0]; if (!f) return; const rd = new FileReader();
+  rd.onload = () => { try { const sp = JSON.parse(rd.result); H.run(sp); S.spec = sp; S.id = null; S.name = sp.name || f.name.replace(/\.json$/,''); $('#pname').value = S.name; S.dirty = true; recompute(); setStatus(); renderProjects(); } catch (e) { alertBox('นำเข้าไม่ได้: ' + (e.message || e)); } };
+  rd.readAsText(f); ev.target.value = '';
+});
+
+$('#pname').value = S.name;
+recompute(); setStatus(); renderProjects();
+})();
+</script>
+
+</body></html>
