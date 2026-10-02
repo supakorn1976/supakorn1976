@@ -762,8 +762,13 @@ module SSHBIM
     qto.sort.each do |(t, c, m), r|
       puts '%-14s %-24s %-12s %5d %9.2f %9.2f %8.1f %8.0f' % [t, c, m, r[:count], r[:vol], r[:area], r[:len], r[:kg]]
     end
-    conc = DATA.select { |r| r[4] =~ /\AS-(Foundation|Column|Beam|RoofBeam|Slab)/ }.sum { |r| r[5].sum { |p| volume(p) } }
-    puts 'RC concrete (gross, joints counted once per member): %.2f m3 ; roof steel: %.0f kg' % [conc, qto.values.sum { |r| r[:kg] }]
+    # a model whose structural tags also hold timber or stone parts lists those materials in NON_RC_MATS;
+    # material keys are render colours, so RC members drawn in a finish colour still count as RC
+    non_rc = const_defined?(:NON_RC_MATS, false) ? NON_RC_MATS : []
+    struct = DATA.select { |r| r[4] =~ /\AS-(Foundation|Column|Beam|RoofBeam|Slab)/ }.flat_map { |r| r[5] }
+    other, conc = struct.partition { |p| non_rc.include?(p.last) }
+    puts 'RC concrete (gross, joints counted once per member): %.2f m3 ; roof steel: %.0f kg' % [conc.sum { |p| volume(p) }, qto.values.sum { |r| r[:kg] }]
+    puts 'Other structural material (not RC): ' + other.group_by(&:last).map { |m, ps| '%s %.2f m3' % [m, ps.sum { |p| volume(p) }] }.join(', ') unless other.empty?
     puts "\nDOOR / WINDOW SCHEDULE"
     schedule.each { |r| puts r.map(&:to_s).join(' | ') }
     nil

@@ -834,6 +834,7 @@ def main():
     out = [HEADER % len(E)]
     out.append('  MATS = {\n' + ',\n'.join('    %s=>%s' % (json.dumps(k), rb(v)) for k, v in MATS.items()) + '\n  }\n')
     out.append("  STOREYS = { 'FND'=>'Foundation (below ±0.00)', 'GF'=>'Ground floor (FFL +0.45, garage +0.12)', 'ROOF'=>'Roof' }\n")
+    out.append("  NON_RC_MATS = %w[timber timber_dark timber_v stone].freeze   # timber posts/beams/rafters, boulder footings: not RC\n")
     out.append("  DISC = { structure: /\\AS-/, architecture: /\\AA-/, mep: /\\A[PE]-/, site: /\\ASite\\z/ }\n\n")
     out.append('  # [ifc, name, mark, level, tag, parts, attrs]\n'
                '  #  part: [:box, x0,x1,y0,y1,z0,z1, mat] | [:poly, [[x,y,z]..], [nx,ny,nz], thick, mat] | [:bar, p1, p2, b, h, mat]\n  DATA = [\n')
