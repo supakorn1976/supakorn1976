@@ -14,7 +14,9 @@ reclaimed door (D01–D20) and window (W01–W12) schedules, a door and window a
 | `boq.py` | Take-off from the model → BOQ → CPM plan → S-curve → payments |
 | `design_calc.py`, `design_report.py` | Preliminary design from the model (foundations, timber superstructure, electrical load) → `design/design_results.json` + `design/design_report.pdf` (Thai, 15 pages) |
 | `drawings.py` | 2D drawing set → `design/BaanSaoYongHin_Drawings.pdf` (A3, 6 sheets, Thai title blocks) |
-| `run_all.py` | Rebuild everything in order: model → design → model (twice, sizes settle) → BOQ → report → drawings |
+| `BaanSaoYongHin_LayOut.rb` | SketchUp Pro → LayOut export: 12 scenes + an A3 `.layout` document (see below) |
+| `layout_sheets.py` | Rasterises the drawing PDF to `layout_sheets/*.png` for the LayOut export |
+| `run_all.py` | Rebuild everything in order: model → design → model (twice, sizes settle) → BOQ → report → drawings → LayOut PNG sheets |
 | `BaanSaoYongHin_BOQ_Plan.xlsx` | สรุป (ปร.5), BOQ (ปร.4, formulas), ถอดปริมาณ (every quantity traced to a BIM element), ประตูหน้าต่าง, แผนงาน (CPM + Gantt), S-Curve, งวดงาน, ข้อสมมติ |
 | `tracker/` | Construction tracker web app (`index.html` + generated `plan.js`); see below |
 | `door_window_schedule.csv` | The 32 reclaimed marks (40 physical units) with sizes, pieces available, placed, spare, and where each is used |
@@ -110,6 +112,35 @@ Vector A3 sheets drawn from the model coordinates and the design results, with T
 | E-01 | Single line diagram: PEA → meter → MDB → feeders → CU-A / CU-C, every breaker, RCD and cable |
 | E-02 | Load schedules for MDB, CU-A, CU-C with per-phase VA and currents |
 | E-03 | Electrical layout 1:125: lights (with circuit numbers), sockets, switches, boards, buried feeder routes |
+
+## SketchUp LayOut export (`BaanSaoYongHin_LayOut.rb`)
+
+Needs SketchUp Pro 2018 or newer (the LayOut Ruby API ships with it). In the Ruby Console:
+
+```ruby
+load 'C:/path/BaanSaoYongHin_BIM.rb'
+BaanSaoYongHinBIM.build
+# File > Save As... BaanSaoYongHin.skp   (LayOut links to the saved file)
+load 'C:/path/BaanSaoYongHin_LayOut.rb'
+BaanSaoYongHinLayOut.export          # writes BaanSaoYongHin.layout next to the .skp
+```
+
+It adds scenes `L01`–`L12` (orthographic cameras, per-scene tag visibility, section cuts on tag `L-Sections`),
+saves the model, then builds an A3 landscape LayOut document with Thai title blocks:
+
+| Sheet | Content |
+|---|---|
+| A-01 | Roof and site plan 1:200 |
+| A-02 | Floor plan, cut at +1.50, 1:125 |
+| A-03 / A-04 | South + north / east + west elevations 1:150 |
+| A-05 | Sections A-A (building A), B-B (building C), C-C (garage) 1:100 + structure 3D |
+| A-06 | Overall perspective + MEP 3D |
+| S-01 … E-03 | The 2D drawing set as full-page images (`layout_sheets/*.png`, 150 dpi) |
+
+The model viewports stay linked to the `.skp`: edit the model, then *Update Model Reference* in LayOut. The
+script was checked against the API definitions only, not run in SketchUp here. If the floor plan or a section shows
+the half that should be cut away, run `BaanSaoYongHinLayOut.export(flip: true)`. Dimensions and labels are not
+added automatically; add them in LayOut.
 
 ## Construction tracker (`tracker/index.html`)
 
