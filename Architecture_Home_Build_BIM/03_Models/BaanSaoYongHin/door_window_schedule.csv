@@ -1,0 +1,33 @@
+Mark,Type,Width_m,Height_m,Pieces,Placed,Spare,PlacedIn
+D01,Door,0.76,1.84,1,0,1,(spare - not placed)
+D02,Door,0.85,1.85,1,1,0,D-R2-W/D02
+D03,Door,0.70,1.82,1,1,0,A-W-BA2/D03
+D04,Door,0.86,1.82,1,0,1,(spare - not placed)
+D05,Door,0.83,1.93,1,0,1,(spare - not placed)
+D06,Door,0.86,1.93,1,0,1,(spare - not placed)
+D07,Door,0.85,1.84,1,1,0,A-W-W1/D07
+D08,Door,0.69,1.81,1,1,0,C-W-BE/D08
+D09,Door,0.95,2.46,1,0,1,(spare - not placed)
+D10,Door,0.86,2.45,1,0,1,(spare - not placed)
+D11,Door,1.00,2.50,1,0,1,(spare - not placed)
+D12,Door,0.81,1.85,1,1,0,C-W-P2/D12
+D13,Door,0.86,1.90,1,1,0,A-W-BP/D13
+D14,Door,0.86,1.88,1,1,0,A-W-BW/D14
+D15,Door,0.86,1.92,1,1,0,C-W-W/D15
+D16,Door,0.86,2.15,1,1,0,D-R1-E/D16
+D17,Door,0.78,1.85,1,1,0,C-W-P1/D17
+D18,Door,0.78,1.84,1,1,0,C-W-P5/D18
+D19,Door,0.78,1.87,1,1,0,A-W-BE/D19
+D20,Door,0.66,1.77,1,1,0,C-W-P4/D20
+W01,Window,1.56,0.57,1,1,0,A-W-N1/W01
+W02,Window,1.40,1.38,1,1,0,C-W-N1/W02
+W03,Window,1.40,1.38,3,2,1,A-W-BS/W03 C-W-E/W03
+W04,Window,1.85,1.38,3,2,1,A-W-N2/W04 C-W-N2/W04
+W05,Window,1.32,0.98,2,2,0,A-W-E/W05 C-W-N3/W05
+W06,Window,1.37,0.98,2,2,0,C-W-W/W06 D-R1-S/W06
+W07,Window,1.29,0.98,1,1,0,A-W-S0/W07
+W08,Window,1.07,0.96,1,1,0,C-W-B2S/W08
+W09,Window,1.41,1.33,1,1,0,A-W-N3/W09
+W10,Window,1.85,1.33,1,1,0,A-W-N2/W10
+W11,Window,1.40,1.33,3,2,1,A-W-N2/W11 D-R2-S/W11
+W12,Window,1.29,0.89,1,1,0,A-W-W2/W12

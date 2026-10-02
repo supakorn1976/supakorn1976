@@ -1,0 +1,793 @@
+<title>Baan Sao Yong Hin Site Tracker</title>
+<meta name="description" content="ระบบติดตามงานก่อสร้าง บ้านเสายงหิน: แผนงาน CPM, ความก้าวหน้า, S-Curve, 4D, บันทึกประจำวัน, ปัญหา, งวดงาน, BOQ">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: site-office board. Sticky header + tab rail, each tab a working surface; numbers in mono, headings in Chakra Petch. */
+:root {
+  --bg: #EDEFEC;            /* concrete */
+  --surface: #FAFBF9;
+  --sunk: #E2E6E1;
+  --ink: #1E2925;
+  --muted: #5B6862;
+  --line: #CDD4CE;
+  --accent: #8A5A2B;        /* oiled reclaimed teak */
+  --accent-ink: #FFFFFF;
+  --plan: #9DB0A8;          /* fibre-cement grey-green: planned */
+  --ok: #2F7A4F; --warn: #B7791F; --bad: #B33A2E; --info: #2E6A8E;
+  --ok-bg: #DDEFE3; --warn-bg: #F6EBD3; --bad-bg: #F5DEDA; --info-bg: #DCE9F1;
+  --display: "Chakra Petch", "IBM Plex Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
+  --body: "IBM Plex Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --scene: #DCE4E0;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141917; --surface: #1C2320; --sunk: #232B28; --ink: #E3E9E5; --muted: #9AA8A1; --line: #34403B;
+  --accent: #D29A5C; --accent-ink: #1A130C; --plan: #5E7169;
+  --ok: #6CC08E; --warn: #E2A84B; --bad: #EE7B6C; --info: #78B3D8;
+  --ok-bg: #1E3528; --warn-bg: #3A2F18; --bad-bg: #3D221E; --info-bg: #1B2F3C; --scene: #1D2522; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1C2320; --sunk: #232B28; --ink: #E3E9E5; --muted: #9AA8A1; --line: #34403B;
+  --accent: #D29A5C; --accent-ink: #1A130C; --plan: #5E7169;
+  --ok: #6CC08E; --warn: #E2A84B; --bad: #EE7B6C; --info: #78B3D8;
+  --ok-bg: #1E3528; --warn-bg: #3A2F18; --bad-bg: #3D221E; --info-bg: #1B2F3C; --scene: #1D2522; color-scheme: dark }
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+html, body { background: var(--bg); color: var(--ink) }
+body { margin: 0; font: 14px/1.55 var(--body); padding-inline: 16px; padding-block: 0 40px }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: .01em }
+h1 { font-size: 22px; font-weight: 700 } h2 { font-size: 17px; font-weight: 600 } h3 { font-size: 14.5px; font-weight: 600 }
+.num, td.n, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums }
+.wrap { max-width: 1240px; margin: 0 auto }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); margin-inline: -16px; padding: 12px 16px 0; border-bottom: 1px solid var(--line) }
+.toprow { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-end; justify-content: space-between }
+.eyebrow { font: 600 11px/1.2 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+.status-date { display: flex; gap: 8px; align-items: center; flex-wrap: wrap }
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 500; white-space: nowrap }
+.chip.ok { background: var(--ok-bg); color: var(--ok) } .chip.warn { background: var(--warn-bg); color: var(--warn) }
+.chip.bad { background: var(--bad-bg); color: var(--bad) } .chip.info { background: var(--info-bg); color: var(--info) }
+.chip.idle { background: var(--sunk); color: var(--muted) }
+nav.tabs { display: flex; gap: 2px; overflow-x: auto; margin-top: 10px; scrollbar-width: thin }
+nav.tabs button { font: 500 13.5px var(--body); color: var(--muted); background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 12px; cursor: pointer; white-space: nowrap }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent) }
+nav.tabs button:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+main { padding-top: 18px; display: grid; gap: 18px }
+section.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0 }
+.panel-head { display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: space-between; align-items: baseline; margin-bottom: 12px }
+.hint { color: var(--muted); font-size: 12.5px }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 2px; min-width: 0 }
+.kpi .v { font: 600 24px/1.2 var(--mono); font-variant-numeric: tabular-nums }
+.kpi .s { font-size: 12.5px; color: var(--muted) }
+.meter { height: 6px; background: var(--sunk); border-radius: 3px; position: relative; overflow: hidden; margin-top: 6px }
+.meter i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 3px }
+.meter b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink) }
+.cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px }
+@media (max-width: 860px) { .cols { grid-template-columns: minmax(0, 1fr) } }
+.scroll-x { overflow-x: auto; min-width: 0 }
+table { border-collapse: collapse; width: 100%; font-size: 13px }
+th { text-align: left; font: 600 12px var(--body); color: var(--muted); border-bottom: 1px solid var(--line); padding: 6px 8px; white-space: nowrap }
+td { border-bottom: 1px solid var(--line); padding: 6px 8px; vertical-align: top }
+td.n, th.n { text-align: right; white-space: nowrap }
+tr.grp td { background: var(--sunk); font-weight: 600 }
+.list { display: grid; gap: 10px }
+.item { border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; min-width: 0 }
+.item .meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; color: var(--muted); font-size: 12.5px }
+.item p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere }
+.empty { border: 1px dashed var(--line); border-radius: 6px; padding: 18px; color: var(--muted); text-align: center }
+form.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px 12px; align-items: end }
+form.grid .wide { grid-column: 1 / -1 }
+label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); min-width: 0 }
+input, select, textarea { font: 14px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; width: 100%; min-width: 0 }
+textarea { min-height: 64px; resize: vertical }
+button.btn { font: 600 13.5px var(--body); border-radius: 6px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink) }
+button.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line) }
+button.btn:disabled { opacity: .5; cursor: not-allowed }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center }
+.gantt-box { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface) }
+.gantt-box svg { display: block }
+.gantt-box text { font-family: var(--body); fill: var(--ink) }
+.gantt-row { cursor: pointer }
+.gantt-row:hover rect.hit { fill: var(--sunk) }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted) }
+.legend span { display: inline-flex; gap: 6px; align-items: center }
+.sw { width: 14px; height: 10px; border-radius: 2px; display: inline-block }
+dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); width: min(560px, calc(100vw - 32px)); padding: 18px }
+dialog::backdrop { background: rgba(10, 16, 14, .45) }
+#view3d { position: relative; height: min(70vh, 620px); min-height: 340px; background: var(--scene); border-radius: 6px; overflow: hidden }
+#view3d canvas { display: block; width: 100%; height: 100% }
+.timebar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-top: 12px }
+.timetrack { flex: 1 1 260px; min-width: 0; display: grid; gap: 2px }
+.timehead { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline }
+.timehead b { font-size: 15px }
+.timeends { display: flex; justify-content: space-between }
+#slider4d { padding: 0; border: 0; background: none; accent-color: var(--accent) }
+#info3d { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 12.5px }
+#info3d:empty { display: none }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 20 }
+.banner { border-radius: 6px; padding: 8px 12px; font-size: 13px }
+.banner.info { background: var(--info-bg); color: var(--info) } .banner.warn { background: var(--warn-bg); color: var(--warn) }
+svg .axis { stroke: var(--line) } svg .lbl { fill: var(--muted); font: 11px var(--mono) }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important } }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="toprow">
+    <div>
+      <div class="eyebrow">ระบบติดตามงานก่อสร้าง · Site tracker</div>
+      <h1>บ้านเสายงหิน — Baan Sao Yong Hin</h1>
+    </div>
+    <div class="status-date">
+      <label for="statusDate" style="display:flex;gap:6px;align-items:center">วันที่รายงาน
+        <input type="date" id="statusDate" style="width:auto"></label>
+      <span id="modeChip" class="chip idle">กำลังเชื่อมต่อ…</span>
+    </div>
+  </div>
+  <nav class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-tab="overview" aria-selected="true">ภาพรวม</button>
+    <button role="tab" data-tab="gantt" aria-selected="false">แผนงาน &amp; ความก้าวหน้า</button>
+    <button role="tab" data-tab="scurve" aria-selected="false">S-Curve</button>
+    <button role="tab" data-tab="model" aria-selected="false">โมเดล 4D</button>
+    <button role="tab" data-tab="logs" aria-selected="false">บันทึกประจำวัน</button>
+    <button role="tab" data-tab="issues" aria-selected="false">ปัญหา / งานแก้ไข</button>
+    <button role="tab" data-tab="pay" aria-selected="false">งวดงาน</button>
+    <button role="tab" data-tab="boq" aria-selected="false">BOQ</button>
+  </nav>
+</header>
+
+<main>
+  <div id="banner" hidden></div>
+
+  <!-- overview -->
+  <div data-pane="overview" style="display:grid;gap:18px">
+    <div class="kpis" id="kpis"></div>
+    <div class="cols">
+      <section class="panel">
+        <div class="panel-head"><h2>S-Curve: แผน vs ผลงาน</h2><span class="hint">% ของมูลค่างานต้นทุนทั้งโครงการ</span></div>
+        <div class="scroll-x" id="miniCurve"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>ต้องทำ ณ วันที่รายงาน</h2><span class="hint" id="dueHint"></span></div>
+        <div class="list" id="dueList"></div>
+      </section>
+    </div>
+    <div class="cols">
+      <section class="panel">
+        <div class="panel-head"><h2>ความก้าวหน้าแยกหมวดงาน</h2><span class="hint">มูลค่าที่ทำได้ / มูลค่าทั้งหมด (บาท ไม่รวม Factor F)</span></div>
+        <div class="scroll-x" id="catTable"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h2>บันทึกล่าสุด</h2><button class="btn ghost" data-goto="logs">บันทึกประจำวัน</button></div>
+        <div class="list" id="recentLogs"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- gantt -->
+  <section class="panel" data-pane="gantt" hidden>
+    <div class="panel-head">
+      <h2>แผนงาน CPM และความก้าวหน้า</h2>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--plan)"></i>แผน</span>
+        <span><i class="sw" style="background:var(--accent)"></i>ทำแล้ว</span>
+        <span><i class="sw" style="border:2px solid var(--bad)"></i>งานวิกฤต</span>
+        <span><i class="sw" style="background:var(--bad);width:2px"></i>วันที่รายงาน</span>
+      </div>
+    </div>
+    <p class="hint" style="margin:0 0 10px">กดที่แถวกิจกรรมเพื่อบันทึก % ความก้าวหน้า วันเริ่ม/เสร็จจริง และหมายเหตุ · วันทำงาน จ.–ส. ไม่รวมวันหยุดนักขัตฤกษ์</p>
+    <div class="gantt-box" id="gantt"></div>
+  </section>
+
+  <!-- s-curve -->
+  <section class="panel" data-pane="scurve" hidden>
+    <div class="panel-head"><h2>S-Curve รายสัปดาห์</h2><button class="btn ghost" id="exportBtn">ส่งออกรายงาน CSV</button></div>
+    <div class="scroll-x" id="bigCurve"></div>
+    <div class="scroll-x" style="margin-top:14px" id="weekTable"></div>
+  </section>
+
+  <!-- 4D -->
+  <section class="panel" data-pane="model" hidden>
+    <div class="panel-head">
+      <h2>โมเดล 4D</h2>
+      <div class="row">
+        <label for="mode4d" style="display:flex;gap:6px;align-items:center">แสดง
+          <select id="mode4d" style="width:auto"><option value="actual">สถานะจริง</option><option value="plan">ตามแผน</option></select></label>
+      </div>
+    </div>
+    <div class="legend" style="margin-bottom:10px">
+      <span><i class="sw" style="background:var(--ok)"></i>เสร็จ</span><span><i class="sw" style="background:var(--warn)"></i>กำลังทำ</span>
+      <span><i class="sw" style="background:var(--bad)"></i>ล่าช้า</span><span><i class="sw" style="background:var(--plan);opacity:.5"></i>ยังไม่เริ่ม</span>
+      <span>ลากหมุน · ล้อเลื่อนซูม · คลิกดูชิ้นส่วน</span>
+    </div>
+    <div id="view3d"><div id="info3d"></div></div>
+    <div class="timebar">
+      <button class="btn" type="button" id="play4d" aria-label="เล่นลำดับการก่อสร้าง">▶ เล่น</button>
+      <div class="timetrack">
+        <div class="timehead"><b class="mono" id="date4d"></b><span class="hint" id="sum4d"></span></div>
+        <input type="range" id="slider4d" min="0" max="0" step="1" value="0" aria-label="เลื่อนวันที่ในโมเดล 4D">
+        <div class="timeends hint"><span id="from4d"></span><span id="to4d"></span></div>
+      </div>
+      <button class="btn ghost" type="button" id="now4d">วันที่รายงาน</button>
+    </div>
+    <p class="hint" id="note4d" style="margin:6px 0 0"></p>
+  </section>
+
+  <!-- logs -->
+  <div data-pane="logs" hidden style="display:grid;gap:18px">
+    <section class="panel">
+      <div class="panel-head"><h2>บันทึกประจำวัน (Daily report)</h2></div>
+      <form class="grid" id="logForm">
+        <label for="logDate">วันที่<input type="date" id="logDate" required></label>
+        <label for="logWeather">สภาพอากาศ<select id="logWeather"><option>แดดจัด</option><option>ฟ้าครึ้ม</option><option>ฝนเล็กน้อย</option><option>ฝนตกหนัก (หยุดงานบางส่วน)</option></select></label>
+        <label for="logWorkers">จำนวนคนงาน<input type="number" id="logWorkers" min="0" step="1" placeholder="เช่น 8"></label>
+        <label for="logTrades">ทีมช่างที่เข้างาน<input id="logTrades" placeholder="เช่น ช่างไม้ 4, ช่างปูน 3, ไฟฟ้า 1"></label>
+        <label class="wide" for="logWork">งานที่ทำวันนี้<textarea id="logWork" required placeholder="เช่น ตั้งเสาไม้อาคาร A แนว N ครบ 6 ต้น, เทตอม่อชาน"></textarea></label>
+        <label class="wide" for="logProblems">ปัญหา / วัสดุเข้า / ผู้เข้าตรวจงาน<textarea id="logProblems" placeholder="ถ้ามี"></textarea></label>
+        <div class="wide row"><button class="btn" type="submit" id="logSave">บันทึก</button><span class="hint" id="logMsg"></span></div>
+      </form>
+    </section>
+    <section class="panel"><div class="panel-head"><h2>บันทึกทั้งหมด</h2><span class="hint" id="logCount"></span></div><div class="list" id="logList"></div></section>
+  </div>
+
+  <!-- issues -->
+  <div data-pane="issues" hidden style="display:grid;gap:18px">
+    <section class="panel">
+      <div class="panel-head"><h2>แจ้งปัญหา / งานแก้ไข (Defect &amp; issue)</h2></div>
+      <form class="grid" id="issueForm">
+        <label class="wide" for="isTitle">เรื่อง<input id="isTitle" required placeholder="เช่น เสา C-C-E-M เอียงเกินพิกัด 5 มม."></label>
+        <label for="isBld">อาคาร<select id="isBld"><option value="A">อาคาร A</option><option value="C">อาคาร C</option><option value="D">อาคาร D</option><option value="S">ภายนอก</option></select></label>
+        <label for="isAct">กิจกรรม<select id="isAct"></select></label>
+        <label for="isSev">ความรุนแรง<select id="isSev"><option value="high">สูง (หยุดงาน/ความปลอดภัย)</option><option value="med" selected>กลาง</option><option value="low">ต่ำ</option></select></label>
+        <label for="isOwner">ผู้รับผิดชอบ<input id="isOwner" placeholder="เช่น หัวหน้าช่างไม้"></label>
+        <label for="isDue">กำหนดแก้<input type="date" id="isDue"></label>
+        <div class="wide row"><button class="btn" type="submit" id="isSave">บันทึกปัญหา</button><span class="hint" id="isMsg"></span></div>
+      </form>
+    </section>
+    <section class="panel"><div class="panel-head"><h2>รายการปัญหา</h2>
+      <label for="isFilter" style="display:flex;gap:6px;align-items:center">สถานะ<select id="isFilter" style="width:auto"><option value="open">ยังไม่ปิด</option><option value="all">ทั้งหมด</option><option value="closed">ปิดแล้ว</option></select></label></div>
+      <div class="list" id="issueList"></div></section>
+  </div>
+
+  <!-- payments -->
+  <section class="panel" data-pane="pay" hidden>
+    <div class="panel-head"><h2>งวดงานและการเบิกจ่าย</h2><span class="hint">มูลค่างวด = ต้นทุนกิจกรรมในงวด × Factor F</span></div>
+    <div class="scroll-x" id="payTable"></div>
+  </section>
+
+  <!-- boq -->
+  <section class="panel" data-pane="boq" hidden>
+    <div class="panel-head"><h2>BOQ และมูลค่างานที่ทำได้</h2>
+      <div class="row">
+        <label for="boqCat" style="display:flex;gap:6px;align-items:center">หมวด<select id="boqCat" style="width:auto"><option value="">ทั้งหมด</option></select></label>
+        <label for="boqBld" style="display:flex;gap:6px;align-items:center">อาคาร<select id="boqBld" style="width:auto"><option value="">ทั้งหมด</option><option value="A">A</option><option value="C">C</option><option value="D">D</option><option value="S">ภายนอก</option></select></label>
+      </div></div>
+    <div class="scroll-x" id="boqTable"></div>
+  </section>
+</main>
+</div>
+
+<dialog id="actDlg">
+  <form id="actForm" method="dialog" style="display:grid;gap:12px">
+    <div><div class="eyebrow" id="dlgCode"></div><h2 id="dlgName"></h2><div class="hint" id="dlgPlan"></div></div>
+    <label for="dlgPct">ความก้าวหน้า <b id="dlgPctV" class="mono"></b>
+      <input type="range" id="dlgPct" min="0" max="100" step="5"></label>
+    <div class="row" style="gap:12px">
+      <label for="dlgStart" style="flex:1">เริ่มจริง<input type="date" id="dlgStart"></label>
+      <label for="dlgFinish" style="flex:1">เสร็จจริง<input type="date" id="dlgFinish"></label>
+    </div>
+    <label for="dlgNote">หมายเหตุ<textarea id="dlgNote" placeholder="เช่น รอไม้เก่าจากโรงไม้ 3 วัน"></textarea></label>
+    <div class="hint" id="dlgBy"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" value="cancel" type="submit">ยกเลิก</button><button class="btn" id="dlgSave" value="save" type="submit">บันทึก</button></div>
+  </form>
+</dialog>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+  // ------------------------------------------------------------ script loading (CDN first, local repo copies as fallback)
+  const load = (srcs) => new Promise((res, rej) => {
+    const next = (i) => {
+      if (i >= srcs.length) return rej(new Error('load failed: ' + srcs.join(', ')));
+      const s = document.createElement('script'); s.src = srcs[i];
+      s.onload = () => res(srcs[i]); s.onerror = () => { s.remove(); next(i + 1); };
+      document.head.appendChild(s);
+    };
+    next(0);
+  });
+  const VENDOR = '../../../web/house-bim-studio/vendor/';
+  const ready = load(['plan.js']).then(() => boot()).catch(e => fatal('ไม่พบไฟล์แผนงาน plan.js (' + e.message + ')'));
+  let three = null;
+  const loadThree = () => three || (three = load(['https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', VENDOR + 'three.min.js'])
+    .then(() => load(['https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js', VENDOR + 'OrbitControls.js']))
+    .then(() => load(['model.js', '../model.js'])));
+
+  function fatal(msg) { const b = document.getElementById('banner'); b.hidden = false; b.className = 'banner warn'; b.textContent = msg; }
+
+  // ------------------------------------------------------------ helpers
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const baht = (n) => (Math.round(n) || 0).toLocaleString('th-TH');
+  const pct = (x, d = 1) => (100 * (x || 0)).toFixed(d) + '%';
+  const toDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+  const iso = (dt) => dt.toISOString().slice(0, 10);
+  const thd = (s) => s ? toDate(s).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC' }) : '–';
+  const todayIso = () => { const d = new Date(); return iso(new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))); };
+  const store = { get(k, d) { try { const v = localStorage.getItem('bsy.ui.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+                  set(k, v) { try { localStorage.setItem('bsy.ui.' + k, JSON.stringify(v)); } catch (e) { /* convenience only */ } } };
+  let toastT = 0;
+  function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600); }
+  const BLD = { A: 'อาคาร A', C: 'อาคาร C', D: 'อาคาร D', S: 'ภายนอก' };
+
+  // ------------------------------------------------------------ local stand-in for the claude.ai db (same calls the page uses)
+  function LocalDB() {
+    const KEY = 'bsy.tracker.v1', subs = {};
+    const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { return {}; } };
+    const write = (o) => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) { const er = new Error('พื้นที่จัดเก็บในเบราว์เซอร์เต็มหรือถูกปิด'); er.code = 'quota_exceeded'; throw er; } };
+    const snap = (col) => { const o = read()[col] || {}; const docs = Object.entries(o).map(([id, d]) => ({ id, exists: true, data: () => d })); return { docs, size: docs.length, empty: !docs.length }; };
+    const notify = (col) => (subs[col] || []).forEach(cb => { try { cb(snap(col)); } catch (e) { console.error(e); } });
+    window.addEventListener('storage', e => { if (e.key === KEY) Object.keys(subs).forEach(notify); });
+    const docRef = (col, id) => ({
+      id, async get() { const d = (read()[col] || {})[id]; return { id, exists: d !== undefined, data: () => d }; },
+      async set(v) { const o = read(); (o[col] = o[col] || {})[id] = v; write(o); notify(col); },
+      async update(v) { const o = read(); o[col] = o[col] || {}; o[col][id] = Object.assign({}, o[col][id], v); write(o); notify(col); },
+      async delete() { const o = read(); if (o[col]) delete o[col][id]; write(o); notify(col); }
+    });
+    return {
+      doc(path) { const [c, id] = path.split('/'); return docRef(c, id); },
+      collection(col) {
+        const q = { orderBy() { return q; }, limit() { return q; },
+          doc(id) { return docRef(col, id || Math.random().toString(36).slice(2, 12)); },
+          async add(v) { const r = docRef(col, Date.now().toString(36) + Math.random().toString(36).slice(2, 6)); await r.set(v); return r; },
+          onSnapshot(cb) { (subs[col] = subs[col] || []).push(cb); setTimeout(() => cb(snap(col)), 0); return () => { subs[col] = subs[col].filter(x => x !== cb); }; } };
+        return q;
+      }
+    };
+  }
+
+  // ------------------------------------------------------------ state
+  let P, CAL = [], ACT = {}, db = null, user = null, mode = 'local', canWrite = true;
+  const S = { progress: {}, logs: [], issues: [], pay: {}, history: {} };
+  let statusDate = todayIso();
+
+  function boot() {
+    P = window.PLAN;
+    P.acts.forEach(a => { ACT[a.code] = a; });
+    const hol = new Set(P.holidays);
+    for (let d = toDate(P.start); CAL.length < 500; d = new Date(d.getTime() + 864e5)) if (d.getUTCDay() !== 0 && !hol.has(iso(d))) CAL.push(iso(d));
+    const saved = store.get('statusDate', null);
+    statusDate = saved || todayIso();
+    $('statusDate').value = statusDate;
+    $('logDate').value = todayIso();
+    $('isAct').innerHTML = P.acts.map(a => `<option value="${esc(a.code)}">${esc(a.code)} · ${esc(a.name)}</option>`).join('');
+    $('boqCat').innerHTML += P.cats.map(c => `<option value="${esc(c.code)}">${esc(c.title)}</option>`).join('');
+    wireUi();
+    render();
+    connect();
+  }
+
+  async function connect() {
+    try {
+      if (window.claude && typeof window.claude.use === 'function') {
+        [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+        if (db) {
+          mode = 'cloud';
+          const c = user && typeof user.can === 'function' ? user.can('data.write') : null;
+          canWrite = c !== false;
+        } else { mode = 'readonly'; canWrite = false; }
+      } else { db = LocalDB(); mode = 'local'; }
+    } catch (e) { db = LocalDB(); mode = 'local'; }
+    const chip = $('modeChip');
+    if (mode === 'cloud') { chip.className = 'chip ok'; chip.textContent = canWrite ? 'ข้อมูลร่วมกัน · ออนไลน์' : 'ดูอย่างเดียว'; }
+    else if (mode === 'local') { chip.className = 'chip info'; chip.textContent = 'เก็บในเบราว์เซอร์นี้'; }
+    else { chip.className = 'chip warn'; chip.textContent = 'ดูแผนอย่างเดียว'; const b = $('banner'); b.hidden = false; b.className = 'banner warn';
+      b.textContent = 'ยังไม่ได้เข้าสู่ระบบหรือไม่ได้รับสิทธิ์ข้อมูล จึงแสดงเฉพาะแผนงาน — เข้าสู่ระบบ claude.ai เพื่อบันทึกความก้าวหน้า'; }
+    document.querySelectorAll('#logSave,#isSave,#dlgSave').forEach(b => { b.disabled = !canWrite; });
+    if (!db) return render();
+    const sub = (col, fn) => db.collection(col).onSnapshot(s => { fn(s.docs.map(d => ({ id: d.id, ...(d.data() || {}) }))); render(); },
+      e => toast('อ่านข้อมูลไม่สำเร็จ: ' + (e && (e.message || e.code))));
+    sub('progress', rows => { S.progress = Object.fromEntries(rows.map(r => [r.id, r])); });
+    sub('logs', rows => { S.logs = rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt).localeCompare(String(a.createdAt))); });
+    sub('issues', rows => { S.issues = rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))); });
+    sub('payments', rows => { S.pay = Object.fromEntries(rows.map(r => [r.id, r])); });
+    sub('history', rows => { S.history = Object.fromEntries(rows.map(r => [r.id, r])); });
+  }
+  const me = async () => { try { return user && user.me ? (await user.me()).id : null; } catch (e) { return null; } };
+  const names = {};
+  async function resolveNames(ids) {
+    ids = [...new Set(ids.filter(Boolean))].filter(i => !(i in names));
+    if (!ids.length || !user || !user.profiles) return;
+    try { const ps = await user.profiles(ids); ids.forEach(i => { names[i] = (ps[i] && ps[i].name) || ''; }); render(); } catch (e) { /* names are optional */ }
+  }
+  const who = (id) => (id && names[id]) || '';
+
+  // ------------------------------------------------------------ calculations
+  const pctOf = (code) => Math.max(0, Math.min(100, Number((S.progress[code] || {}).pct) || 0)) / 100;
+  function planFrac(a, day) { let n = 0; for (let i = a.es; i < a.ef; i++) if (CAL[i] <= day) n++; return n / a.dur; }
+  const PV = (day) => P.acts.reduce((s, a) => s + a.cost * planFrac(a, day), 0) / P.direct;
+  const EV = () => P.acts.reduce((s, a) => s + a.cost * pctOf(a.code), 0) / P.direct;
+  function stateOf(a, day) {
+    const p = pctOf(a.code), pf = planFrac(a, day);
+    if (p >= 1) return 'done';
+    if (pf >= 1 || (pf > 0 && p === 0) || (pf > 0 && p + 0.15 < pf)) return 'late';
+    if (p > 0) return 'doing';
+    return 'todo';
+  }
+  const STATE = { done: ['ok', 'เสร็จ'], doing: ['warn', 'กำลังทำ'], late: ['bad', 'ล่าช้า'], todo: ['idle', 'ยังไม่เริ่ม'] };
+  const finishIso = () => P.acts.reduce((m, a) => a.finish > m ? a.finish : m, '');
+
+  // ------------------------------------------------------------ rendering
+  function render() {
+    if (!P) return;
+    renderOverview(); renderGantt(); renderCurve(); renderLogs(); renderIssues(); renderPay(); renderBoq();
+    if (scene3d) { setIdx4d(idx4d, false); paint3d(); }
+  }
+
+  function renderOverview() {
+    const pv = PV(statusDate), ev = EV(), spi = pv > 0 ? ev / pv : null;
+    const open = S.issues.filter(i => i.status !== 'closed');
+    const high = open.filter(i => i.severity === 'high').length;
+    const fin = finishIso();
+    const wdLeft = CAL.filter(d => d > statusDate && d <= fin).length;
+    const forecast = spi && spi > 0 && ev < 1 ? Math.round((CAL.indexOf(fin) + 1) / spi) : null;
+    const fcDate = forecast ? CAL[Math.min(forecast - 1, CAL.length - 1)] : null;
+    const spiCls = spi === null ? 'idle' : spi >= 0.95 ? 'ok' : spi >= 0.85 ? 'warn' : 'bad';
+    $('kpis').innerHTML = [
+      `<div class="kpi"><span class="eyebrow">ผลงานจริง</span><span class="v">${pct(ev)}</span><span class="s">แผน ณ ${thd(statusDate)}: ${pct(pv)}</span><div class="meter"><i style="width:${(ev * 100).toFixed(1)}%"></i><b style="left:${(pv * 100).toFixed(1)}%"></b></div></div>`,
+      `<div class="kpi"><span class="eyebrow">ดัชนีกำหนดเวลา SPI</span><span class="v">${spi === null ? '–' : spi.toFixed(2)}</span><span class="s"><span class="chip ${spiCls}">${spi === null ? 'ยังไม่ถึงวันเริ่มงาน' : spi >= 0.95 ? 'ตามแผน' : spi >= 0.85 ? 'ช้ากว่าแผนเล็กน้อย' : 'ล่าช้า ต้องเร่ง'}</span></span></div>`,
+      `<div class="kpi"><span class="eyebrow">มูลค่างานที่ทำได้</span><span class="v">${baht(ev * P.direct * P.factorF)}</span><span class="s">จาก ${baht(P.direct * P.factorF)} บาท (รวม Factor F)</span></div>`,
+      `<div class="kpi"><span class="eyebrow">กำหนดเสร็จตามแผน</span><span class="v" style="font-size:20px">${thd(fin)}</span><span class="s">${statusDate < P.start ? 'เริ่มงาน ' + thd(P.start) : 'เหลือ ' + wdLeft + ' วันทำงาน'}${fcDate ? ' · คาดการณ์ ' + thd(fcDate) : ''}</span></div>`,
+      `<div class="kpi"><span class="eyebrow">ปัญหาค้าง</span><span class="v">${open.length}</span><span class="s">${high ? `<span class="chip bad">รุนแรง ${high}</span>` : 'ไม่มีเรื่องรุนแรง'}</span></div>`
+    ].join('');
+    $('miniCurve').innerHTML = curveSvg(560, 230);
+    // what should be active now
+    const rows = P.acts.filter(a => { const st = stateOf(a, statusDate), pf = planFrac(a, statusDate); return st === 'late' || st === 'doing' || (pf > 0 && pf < 1); });
+    const nextUp = P.acts.filter(a => a.start > statusDate && pctOf(a.code) === 0).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 3);
+    $('dueHint').textContent = rows.length ? rows.length + ' กิจกรรม' : '';
+    const card = (a, tag) => { const st = stateOf(a, statusDate); return `<div class="item gantt-row" data-act="${esc(a.code)}" tabindex="0" role="button">
+      <div class="meta"><span class="mono">${esc(a.code)}</span><span class="chip ${STATE[st][0]}">${tag || STATE[st][1]}</span>${a.crit ? '<span class="chip bad">วิกฤต</span>' : ''}<span>${thd(a.start)} – ${thd(a.finish)}</span></div>
+      <div>${esc(a.name)}</div><div class="meter"><i style="width:${(pctOf(a.code) * 100).toFixed(0)}%"></i><b style="left:${(planFrac(a, statusDate) * 100).toFixed(0)}%"></b></div></div>`; };
+    $('dueList').innerHTML = rows.length ? rows.map(a => card(a)).join('') :
+      (nextUp.length ? '<div class="hint">ยังไม่มีงานที่ต้องทำ ณ วันนี้ — งานถัดไป:</div>' + nextUp.map(a => card(a, 'เริ่ม ' + thd(a.start))).join('') : '<div class="empty">ทุกกิจกรรมเสร็จแล้ว</div>');
+    // categories
+    const cat = {}; P.cats.forEach(c => { cat[c.code] = { t: c.title, tot: c.total, ev: 0 }; });
+    P.boq.forEach(r => { cat[r.cat].ev += r.total * pctOf(r.act); });
+    $('catTable').innerHTML = `<table><thead><tr><th>หมวด</th><th class="n">ทำได้</th><th class="n">ทั้งหมด</th><th class="n">%</th></tr></thead><tbody>` +
+      P.cats.map(c => `<tr><td>${esc(c.title)}</td><td class="n">${baht(cat[c.code].ev)}</td><td class="n">${baht(c.total)}</td><td class="n">${pct(cat[c.code].ev / c.total)}</td></tr>`).join('') +
+      `<tr class="grp"><td>รวม</td><td class="n">${baht(ev * P.direct)}</td><td class="n">${baht(P.direct)}</td><td class="n">${pct(ev)}</td></tr></tbody></table>`;
+    $('recentLogs').innerHTML = S.logs.length ? S.logs.slice(0, 3).map(logCard).join('') : '<div class="empty">ยังไม่มีบันทึกประจำวัน — เริ่มบันทึกในแท็บ “บันทึกประจำวัน” ตั้งแต่วันแรกที่เข้าพื้นที่</div>';
+  }
+
+  // ---------------- S-curve (planned weekly cumulative vs actual history)
+  function curveData() {
+    let cum = 0;
+    const plan = P.weeks.map((w, i) => { cum += P.planWeekly[i]; return { d: w, v: cum / P.direct }; });
+    const hist = Object.entries(S.history).map(([d, h]) => ({ d, v: Number(h.ev) || 0 })).filter(h => h.d <= statusDate).sort((a, b) => a.d.localeCompare(b.d));
+    if (statusDate >= P.start) hist.push({ d: statusDate, v: EV() });
+    return { plan, hist };
+  }
+  function curveSvg(W, H) {
+    const { plan, hist } = curveData();
+    const L = 40, R = 12, T = 12, B = 26, x0 = toDate(P.weeks[0]).getTime(), x1 = toDate(P.weeks[P.weeks.length - 1]).getTime() + 7 * 864e5;
+    const X = (d) => L + (toDate(d).getTime() - x0) / (x1 - x0) * (W - L - R), Y = (v) => T + (1 - v) * (H - T - B);
+    const pXY = (d, v) => `${X(d).toFixed(1)},${Y(v).toFixed(1)}`;
+    const planPts = [pXY(P.weeks[0], 0)].concat(plan.map((p, i) => pXY(iso(new Date(toDate(p.d).getTime() + 7 * 864e5)), p.v)));
+    let g = '';
+    for (let k = 0; k <= 4; k++) g += `<line class="axis" x1="${L}" x2="${W - R}" y1="${Y(k / 4)}" y2="${Y(k / 4)}"/><text class="lbl" x="${L - 6}" y="${Y(k / 4) + 4}" text-anchor="end">${k * 25}%</text>`;
+    P.weeks.forEach((w, i) => { if (i % 3 === 0) g += `<text class="lbl" x="${X(w) + 2}" y="${H - 8}">${thd(w).replace(/ \d+$/, '')}</text>`; });
+    const sd = statusDate >= P.weeks[0] && toDate(statusDate).getTime() <= x1 ? `<line x1="${X(statusDate)}" x2="${X(statusDate)}" y1="${T}" y2="${H - B}" stroke="var(--bad)" stroke-dasharray="3 3"/>` : '';
+    const area = `<polygon fill="var(--plan)" opacity=".18" points="${planPts.join(' ')} ${(W - R).toFixed(1)},${Y(0).toFixed(1)}"/>`;
+    const act = hist.length ? `<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="${[pXY(P.start, 0)].concat(hist.map(h => pXY(h.d, h.v))).join(' ')}"/>` +
+      `<circle r="4.5" fill="var(--accent)" cx="${X(hist[hist.length - 1].d)}" cy="${Y(hist[hist.length - 1].v)}"/>` : '';
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:${Math.min(W, 420)}px;max-width:${W * 1.6}px" role="img" aria-label="S-Curve แผนเทียบผลงาน">${g}${area}
+      <polyline fill="none" stroke="var(--plan)" stroke-width="2" points="${planPts.join(' ')}"/>${sd}${act}
+      <text class="lbl" x="${W - R}" y="${T + 10}" text-anchor="end">— แผน  ● ผลงานจริง</text></svg>`;
+  }
+  function renderCurve() {
+    $('bigCurve').innerHTML = curveSvg(900, 340);
+    let cum = 0;
+    const histArr = Object.entries(S.history).sort((a, b) => a[0].localeCompare(b[0]));
+    $('weekTable').innerHTML = `<table><thead><tr><th>สัปดาห์</th><th>เริ่ม</th><th class="n">มูลค่าตามแผน (บาท)</th><th class="n">แผนสะสม</th><th class="n">ผลงานสะสม (ล่าสุดในสัปดาห์)</th></tr></thead><tbody>` +
+      P.weeks.map((w, i) => {
+        cum += P.planWeekly[i];
+        const end = iso(new Date(toDate(w).getTime() + 6 * 864e5));
+        const h = histArr.filter(([d]) => d >= w && d <= end).pop();
+        const cur = statusDate >= w && statusDate <= end ? EV() : (h ? Number(h[1].ev) : null);
+        return `<tr><td class="mono">W${i + 1}</td><td>${thd(w)}</td><td class="n">${baht(P.planWeekly[i])}</td><td class="n">${pct(cum / P.direct)}</td><td class="n">${cur === null || w > statusDate ? '–' : pct(cur)}</td></tr>`;
+      }).join('') + '</tbody></table>';
+  }
+
+  // ---------------- Gantt
+  function renderGantt() {
+    const day0 = toDate(P.weeks[0]).getTime(), days = (toDate(finishIso()).getTime() - day0) / 864e5 + 10;
+    const LW = 250, px = 9, RH = 28, H = 40 + P.acts.length * RH, W = LW + days * px + 10;
+    const X = (d) => LW + (toDate(d).getTime() - day0) / 864e5 * px;
+    let s = `<svg width="${W}" height="${H}" role="img" aria-label="แผนงาน Gantt">`;
+    P.weeks.forEach((w, i) => { s += `<line class="axis" x1="${X(w)}" x2="${X(w)}" y1="22" y2="${H}"/>` + (i % 2 === 0 ? `<text class="lbl" x="${X(w) + 3}" y="15">${thd(w).replace(/ \d+$/, '')}</text>` : ''); });
+    P.acts.forEach((a, i) => {
+      const y = 30 + i * RH, x0 = X(a.start), x1 = X(a.finish) + px, p = pctOf(a.code), st = stateOf(a, statusDate);
+      const pr = S.progress[a.code] || {};
+      s += `<g class="gantt-row" data-act="${esc(a.code)}" tabindex="0" role="button" aria-label="${esc(a.code + ' ' + a.name)}">
+        <rect class="hit" x="0" y="${y - 3}" width="${W}" height="${RH}" fill="transparent"/>
+        <text x="8" y="${y + 13}" style="font:500 11.5px var(--mono);fill:var(--muted)">${esc(a.code)}</text>
+        <text x="58" y="${y + 13}" style="font-size:12px">${esc(a.name.length > 30 ? a.name.slice(0, 29) + '…' : a.name)}</text>
+        <rect x="${x0}" y="${y + 2}" width="${x1 - x0}" height="16" rx="3" fill="var(--plan)" ${a.crit ? 'stroke="var(--bad)" stroke-width="1.5"' : ''}/>
+        <rect x="${x0}" y="${y + 6}" width="${(x1 - x0) * p}" height="8" rx="2" fill="var(--accent)"/>
+        ${pr.aStart ? `<path d="M${X(pr.aStart)},${y + 19} l-4,5 h8 z" fill="var(--accent)"/>` : ''}
+        ${pr.aFinish ? `<path d="M${X(pr.aFinish) + px},${y + 19} l-4,5 h8 z" fill="var(--ok)"/>` : ''}
+        <text x="${x1 + 6}" y="${y + 14}" style="font:11px var(--mono);fill:${st === 'late' ? 'var(--bad)' : 'var(--muted)'}">${Math.round(p * 100)}%</text></g>`;
+    });
+    if (statusDate >= P.weeks[0]) s += `<line x1="${X(statusDate)}" x2="${X(statusDate)}" y1="22" y2="${H}" stroke="var(--bad)" stroke-width="1.5"/>`;
+    $('gantt').innerHTML = s + '</svg>';
+  }
+
+  // ---------------- activity dialog
+  let dlgAct = null;
+  function openAct(code) {
+    const a = ACT[code]; if (!a) return;
+    dlgAct = a;
+    const pr = S.progress[code] || {};
+    $('dlgCode').textContent = a.code + (a.crit ? ' · งานวิกฤต' : ' · float ' + a.tf + ' วัน') + ' · งวดที่ ' + a.ms;
+    $('dlgName').textContent = a.name;
+    $('dlgPlan').textContent = `แผน ${thd(a.start)} – ${thd(a.finish)} (${a.dur} วันทำงาน) · มูลค่า ${baht(a.cost)} บาท · ก่อนหน้า: ${a.preds || '–'}`;
+    $('dlgPct').value = Math.round(pctOf(code) * 100); $('dlgPctV').textContent = $('dlgPct').value + '%';
+    $('dlgStart').value = pr.aStart || ''; $('dlgFinish').value = pr.aFinish || ''; $('dlgNote').value = pr.note || '';
+    $('dlgBy').textContent = pr.updatedAt ? 'อัปเดตล่าสุด ' + new Date(pr.updatedAt).toLocaleString('th-TH') + (who(pr.by) ? ' โดย ' + who(pr.by) : '') : 'ยังไม่มีการบันทึก';
+    if (pr.by) resolveNames([pr.by]);
+    $('actDlg').showModal();
+  }
+  async function saveAct() {
+    const a = dlgAct; if (!a || !db || !canWrite) return;
+    let p = Number($('dlgPct').value), s0 = $('dlgStart').value, s1 = $('dlgFinish').value;
+    if (p > 0 && !s0) s0 = statusDate;
+    if (p >= 100 && !s1) s1 = statusDate;
+    if (s1 && p < 100) { toast('ใส่วันเสร็จจริงแล้ว จึงตั้งความก้าวหน้าเป็น 100%'); p = 100; }
+    const rec = { pct: p, aStart: s0, aFinish: s1, note: $('dlgNote').value.trim(), updatedAt: new Date().toISOString(), by: await me() };
+    try {
+      await db.doc('progress/' + a.code).set(rec);
+      S.progress[a.code] = rec;
+      const day = statusDate > todayIso() ? todayIso() : statusDate;
+      await db.doc('history/' + day).set({ ev: EV(), pv: PV(day), at: rec.updatedAt });
+      toast('บันทึก ' + a.code + ' = ' + p + '%');
+    } catch (e) { toast('บันทึกไม่สำเร็จ: ' + (e.message || e.code)); }
+  }
+
+  // ---------------- logs
+  function logCard(l) {
+    return `<div class="item"><div class="meta"><b class="mono" style="color:var(--ink)">${thd(l.date)}</b><span>${esc(l.weather || '')}</span>${l.workers ? `<span>คนงาน ${esc(l.workers)} คน</span>` : ''}${l.trades ? `<span>${esc(l.trades)}</span>` : ''}${who(l.by) ? `<span>· ${esc(who(l.by))}</span>` : ''}</div>
+      <p>${esc(l.work)}</p>${l.problems ? `<p style="color:var(--warn)">ปัญหา: ${esc(l.problems)}</p>` : ''}</div>`;
+  }
+  function renderLogs() {
+    $('logCount').textContent = S.logs.length ? S.logs.length + ' วัน' : '';
+    $('logList').innerHTML = S.logs.length ? S.logs.map(logCard).join('') : '<div class="empty">ยังไม่มีบันทึก — กรอกแบบฟอร์มด้านบนทุกวันที่มีงานในพื้นที่ (สภาพอากาศ คนงาน งานที่ทำ ปัญหา)</div>';
+    resolveNames(S.logs.map(l => l.by));
+  }
+
+  // ---------------- issues
+  const SEV = { high: ['bad', 'สูง'], med: ['warn', 'กลาง'], low: ['idle', 'ต่ำ'] };
+  const IST = { open: ['bad', 'เปิด'], doing: ['warn', 'กำลังแก้'], closed: ['ok', 'ปิดแล้ว'] };
+  function renderIssues() {
+    const f = $('isFilter').value;
+    const rows = S.issues.filter(i => f === 'all' || (f === 'closed' ? i.status === 'closed' : i.status !== 'closed'));
+    $('issueList').innerHTML = rows.length ? rows.map(i => {
+      const overdue = i.status !== 'closed' && i.due && i.due < statusDate;
+      return `<div class="item"><div class="meta"><span class="chip ${SEV[i.severity] ? SEV[i.severity][0] : 'idle'}">${SEV[i.severity] ? SEV[i.severity][1] : ''}</span>
+        <span class="chip ${IST[i.status] ? IST[i.status][0] : 'idle'}">${IST[i.status] ? IST[i.status][1] : ''}</span><span>${esc(BLD[i.bld] || '')}</span><span class="mono">${esc(i.act || '')}</span>
+        ${i.owner ? `<span>ผู้รับผิดชอบ: ${esc(i.owner)}</span>` : ''}${i.due ? `<span style="${overdue ? 'color:var(--bad)' : ''}">กำหนด ${thd(i.due)}${overdue ? ' (เลยกำหนด)' : ''}</span>` : ''}</div>
+        <p>${esc(i.title)}</p>
+        ${canWrite ? `<div class="row">${i.status !== 'doing' && i.status !== 'closed' ? `<button class="btn ghost" data-issue="${esc(i.id)}" data-st="doing">กำลังแก้</button>` : ''}
+          ${i.status !== 'closed' ? `<button class="btn ghost" data-issue="${esc(i.id)}" data-st="closed">ปิดเรื่อง</button>` : `<button class="btn ghost" data-issue="${esc(i.id)}" data-st="open">เปิดใหม่</button>`}</div>` : ''}</div>`;
+    }).join('') : `<div class="empty">${f === 'closed' ? 'ยังไม่มีเรื่องที่ปิด' : 'ไม่มีปัญหาค้าง — แจ้งเรื่องใหม่ด้วยแบบฟอร์มด้านบน'}</div>`;
+  }
+
+  // ---------------- payments
+  const PST = { pending: ['idle', 'ยังไม่ถึง'], ready: ['info', 'พร้อมขอเบิก'], requested: ['warn', 'ยื่นขอเบิกแล้ว'], inspected: ['warn', 'ตรวจรับแล้ว'], paid: ['ok', 'จ่ายแล้ว'] };
+  function renderPay() {
+    let cum = 0, paidSum = 0;
+    const total = P.milestones.reduce((s, m) => s + m.value, 0);
+    $('payTable').innerHTML = `<table><thead><tr><th>งวด</th><th>เงื่อนไข</th><th>กำหนดตามแผน</th><th class="n">มูลค่า (บาท)</th><th class="n">สะสม</th><th>ความพร้อม</th><th>สถานะ</th><th>วันที่</th></tr></thead><tbody>` +
+      P.milestones.map(m => {
+        cum += m.value;
+        const done = m.acts.filter(c => pctOf(c) >= 1).length, ready = done === m.acts.length;
+        const rec = S.pay[String(m.no)] || {};
+        const st = rec.status || (ready ? 'ready' : 'pending');
+        if (st === 'paid') paidSum += m.value * P.factorF;
+        const opts = ['pending', 'requested', 'inspected', 'paid'].map(k => `<option value="${k}" ${rec.status === k ? 'selected' : ''}>${PST[k][1]}</option>`).join('');
+        return `<tr><td class="mono">${m.no}</td><td style="min-width:220px">${esc(m.text)}<div class="hint mono">${m.acts.join(' · ')}</div></td><td>${thd(m.due)}</td>
+          <td class="n">${baht(m.value * P.factorF)}</td><td class="n">${pct(cum / total, 0)}</td>
+          <td><span class="chip ${ready ? 'ok' : 'idle'}">${done}/${m.acts.length} กิจกรรม</span></td>
+          <td>${canWrite ? `<select id="pay${m.no}" data-pay="${m.no}" style="width:auto">${opts}</select>` : `<span class="chip ${PST[st][0]}">${PST[st][1]}</span>`}</td>
+          <td>${rec.date ? thd(rec.date) : '–'}</td></tr>`;
+      }).join('') + `<tr class="grp"><td></td><td>รวมทั้งสัญญา (Factor F ${P.factorF})</td><td></td><td class="n">${baht(total * P.factorF)}</td><td></td><td colspan="3">จ่ายแล้ว ${baht(paidSum)} บาท</td></tr></tbody></table>`;
+  }
+
+  // ---------------- BOQ
+  function renderBoq() {
+    const fc = $('boqCat').value, fb = $('boqBld').value;
+    let grp = null, html = '<table><thead><tr><th>รายการ</th><th>อาคาร</th><th class="n">ปริมาณ</th><th>หน่วย</th><th class="n">จำนวนเงิน (บาท)</th><th>กิจกรรม</th><th class="n">ทำได้</th></tr></thead><tbody>';
+    let sum = 0, evs = 0;
+    P.boq.filter(r => (!fc || r.cat === fc) && (!fb || r.bld === fb)).forEach(r => {
+      if (r.group !== grp) { grp = r.group; html += `<tr class="grp"><td colspan="7">${esc(grp)}</td></tr>`; }
+      const p = pctOf(r.act); sum += r.total; evs += r.total * p;
+      html += `<tr><td style="min-width:220px">${esc(r.desc)}</td><td>${esc(r.bld)}</td><td class="n">${r.qty.toLocaleString('th-TH')}</td><td>${esc(r.unit)}</td><td class="n">${baht(r.total)}</td><td class="mono">${esc(r.act)}</td><td class="n">${Math.round(p * 100)}%</td></tr>`;
+    });
+    $('boqTable').innerHTML = html + `<tr class="grp"><td colspan="4">รวม (ไม่รวม Factor F)</td><td class="n">${baht(sum)}</td><td></td><td class="n">${sum ? pct(evs / sum, 0) : '–'}</td></tr></tbody></table>`;
+  }
+
+  // ---------------- 4D model
+  let scene3d = null;
+  function init3d() {
+    const T = window.THREE, M = window.MODEL, el = $('view3d');
+    const renderer = new T.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    el.prepend(renderer.domElement);
+    const scene = new T.Scene();
+    const cam = new T.PerspectiveCamera(40, 1, 0.1, 800); cam.up.set(0, 0, 1); cam.position.set(-6, -34, 26);
+    const ctl = new T.OrbitControls(cam, renderer.domElement); ctl.target.set(15, 1, 1); ctl.update();
+    scene.add(new T.HemisphereLight(0xffffff, 0x8a8a80, 0.8));
+    const sun = new T.DirectionalLight(0xffffff, 0.55); sun.position.set(-20, -30, 40); scene.add(sun);
+    const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+    const base = {}; for (const [k, [r, g, b, a]] of Object.entries(M.mats)) base[k] = new T.MeshLambertMaterial({ color: new T.Color(r / 255, g / 255, b / 255), transparent: a < 1, opacity: a, side: T.DoubleSide });
+    const st = { doing: new T.MeshLambertMaterial({ color: new T.Color(css('--warn')) }), late: new T.MeshLambertMaterial({ color: new T.Color(css('--bad')) }),
+      todo: new T.MeshLambertMaterial({ color: new T.Color(css('--plan')), transparent: true, opacity: 0.16, depthWrite: false }) };
+    const V = (a) => new T.Vector3(a[0], a[1], a[2]);
+    function polyGeo(pts, n, t) {
+      const nn = V(n).normalize().multiplyScalar(t), lo = pts.map(V), hi = lo.map(p => p.clone().add(nn)), k = lo.length, pos = [];
+      const tri = (a, b, c) => pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+      for (let i = 1; i < k - 1; i++) { tri(lo[0], lo[i + 1], lo[i]); tri(hi[0], hi[i], hi[i + 1]); }
+      for (let i = 0; i < k; i++) { const j = (i + 1) % k; tri(lo[i], lo[j], hi[j]); tri(lo[i], hi[j], hi[i]); }
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return g;
+    }
+    const meshes = [];
+    for (const e of M.elements) {
+      if (e.tag === 'A-Ceiling') continue;
+      for (const p of e.parts) {
+        const mk = p[p.length - 1]; let m;
+        if (p[0] === 'box') { m = new T.Mesh(new T.BoxGeometry(p[2] - p[1], p[4] - p[3], p[6] - p[5])); m.position.set((p[1] + p[2]) / 2, (p[3] + p[4]) / 2, (p[5] + p[6]) / 2); }
+        else if (p[0] === 'poly') m = new T.Mesh(polyGeo(p[1], p[2], p[3]));
+        else {
+          const a = V(p[1]), b = V(p[2]), u = b.clone().sub(a), len = u.length(); u.normalize();
+          let side = u.clone().cross(new T.Vector3(0, 0, 1)); if (side.length() < 1e-6) side = new T.Vector3(1, 0, 0); side.normalize();
+          const up = side.clone().cross(u).normalize(); if (up.z < 0) up.negate();
+          m = new T.Mesh(new T.BoxGeometry(p[3], p[4], len)); m.matrixAutoUpdate = false; m.matrix.makeBasis(side, up, u).setPosition(a.add(b).multiplyScalar(0.5));
+        }
+        m.userData = { el: e, mk, act: P.elemAct[e.name] || null };
+        scene.add(m); meshes.push(m);
+      }
+    }
+    const ray = new T.Raycaster(), mouse = new T.Vector2(); let down = null;
+    renderer.domElement.addEventListener('pointerdown', ev => { down = [ev.clientX, ev.clientY]; });
+    renderer.domElement.addEventListener('pointerup', ev => {
+      if (!down || Math.hypot(ev.clientX - down[0], ev.clientY - down[1]) > 4) return;
+      const r = renderer.domElement.getBoundingClientRect();
+      mouse.set((ev.clientX - r.left) / r.width * 2 - 1, -(ev.clientY - r.top) / r.height * 2 + 1); ray.setFromCamera(mouse, cam);
+      const hit = ray.intersectObjects(meshes.filter(m => m.visible), false)[0];
+      if (!hit) { $('info3d').innerHTML = ''; return; }
+      const d = hit.object.userData, a = d.act && ACT[d.act];
+      $('info3d').innerHTML = `<b>${esc(d.el.name)}</b> · ${esc(d.el.ifc)}${a ? `<br><span class="mono">${esc(a.code)}</span> ${esc(a.name)} · ${Math.round(pctOf(a.code) * 100)}% ` +
+        `<button class="btn ghost" style="padding:2px 8px" data-act="${esc(a.code)}">บันทึกความก้าวหน้า</button>` : ''}`;
+    });
+    function resize() { const w = el.clientWidth, h = el.clientHeight; if (!w) return; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+    window.addEventListener('resize', resize);
+    scene3d = { T, renderer, scene, cam, ctl, meshes, base, st, resize, css };
+    resize(); reset4d();
+    (function loop() { requestAnimationFrame(loop); if (!$('view3d').closest('[hidden]')) { ctl.update(); renderer.render(scene, cam); } })();
+  }
+  // ---------------- 4D time cursor: plan mode runs to the planned finish; actual mode stops at the report date
+  let idx4d = 0, play4d = 0;
+  const lastPlanIdx = () => P.acts.reduce((m, a) => Math.max(m, a.ef - 1), 0);
+  const idxOf = (day) => { let i = 0; while (i + 1 < CAL.length && CAL[i + 1] <= day) i++; return CAL[0] > day ? 0 : i; };
+  function max4d() { return $('mode4d').value === 'plan' ? lastPlanIdx() : Math.min(lastPlanIdx(), idxOf(statusDate)); }
+  function state4d(a, day) {
+    if ($('mode4d').value === 'plan') { const f = planFrac(a, day); return f >= 1 ? 'done' : f > 0 ? 'doing' : 'todo'; }
+    if (day >= statusDate) { const k = stateOf(a, statusDate); return k === 'late' && pctOf(a.code) === 0 && planFrac(a, statusDate) === 0 ? 'todo' : k; }
+    const pr = S.progress[a.code] || {}, pf = planFrac(a, day);
+    if (pr.aFinish && pr.aFinish <= day) return 'done';
+    if (pr.aStart && pr.aStart <= day) return pf >= 1 ? 'late' : 'doing';
+    return pf > 0 ? 'late' : 'todo';
+  }
+  function setIdx4d(i, repaint = true) {
+    const mx = max4d();
+    idx4d = Math.max(0, Math.min(mx, i));
+    const sl = $('slider4d'); sl.max = String(mx); sl.value = String(idx4d);
+    $('from4d').textContent = thd(CAL[0]); $('to4d').textContent = thd(CAL[mx]);
+    if (repaint) paint3d();
+  }
+  function reset4d() { stopPlay(); setIdx4d(idxOf(statusDate < P.start ? P.start : statusDate)); }
+  function stopPlay() { if (play4d) { clearInterval(play4d); play4d = 0; } $('play4d').textContent = '▶ เล่น'; }
+  function togglePlay() {
+    if (play4d) return stopPlay();
+    if (idx4d >= max4d()) setIdx4d(0);
+    $('play4d').textContent = '❚❚ หยุด';
+    play4d = setInterval(() => {
+      if ($('view3d').closest('[hidden]') || idx4d >= max4d()) return stopPlay();
+      setIdx4d(idx4d + 1);
+    }, 140);
+  }
+  function paint3d() {
+    const s = scene3d;
+    if (!s) return;
+    const day = CAL[idx4d], planMode = $('mode4d').value === 'plan';
+    s.scene.background = new s.T.Color(s.css('--scene'));
+    const cnt = { done: 0, doing: 0, late: 0, todo: 0 }, st = {};
+    P.acts.forEach(a => { st[a.code] = state4d(a, day); cnt[st[a.code]]++; });
+    for (const m of s.meshes) {
+      const k = m.userData.act ? st[m.userData.act] || 'done' : 'done';
+      m.material = k === 'done' ? (s.base[m.userData.mk] || s.base.concrete) : s.st[k];
+    }
+    const wd = idx4d + 1;
+    $('date4d').textContent = toDate(day).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC' });
+    $('sum4d').textContent = `วันทำงานที่ ${wd} · แผนสะสม ${pct(PV(day))} · เสร็จ ${cnt.done} · กำลังทำ ${cnt.doing}` + (cnt.late ? ` · ล่าช้า ${cnt.late}` : '') + ` · ยังไม่เริ่ม ${cnt.todo} กิจกรรม`;
+    $('note4d').textContent = planMode ? 'โหมดตามแผน: เลื่อนได้ถึงวันเสร็จตามแผน' :
+      (statusDate < P.start ? 'ยังไม่ถึงวันเริ่มงาน — สลับเป็น “ตามแผน” เพื่อดูลำดับการก่อสร้าง' : 'โหมดสถานะจริง: เลื่อนได้ถึงวันที่รายงาน วันในอดีตใช้วันเริ่ม/เสร็จจริงที่บันทึกไว้');
+  }
+
+  // ------------------------------------------------------------ export
+  async function exportCsv() {
+    const rows = [['code', 'activity', 'plan_start', 'plan_finish', 'critical', 'cost_baht', 'progress_pct', 'actual_start', 'actual_finish', 'status_' + statusDate, 'note']];
+    P.acts.forEach(a => { const r = S.progress[a.code] || {}; rows.push([a.code, a.name, a.start, a.finish, a.crit ? 'Y' : '', a.cost.toFixed(2), Math.round(pctOf(a.code) * 100), r.aStart || '', r.aFinish || '', STATE[stateOf(a, statusDate)][1], r.note || '']); });
+    rows.push([], ['summary', 'planned_pct', pct(PV(statusDate)), 'earned_pct', pct(EV())]);
+    const csv = '﻿' + rows.map(r => r.map(v => /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v).join(',')).join('\n');
+    const name = 'BaanSaoYongHin_progress_' + statusDate + '.csv';
+    try {
+      const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+      if (dl) { await dl.save({ filename: name, data: csv }); return; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (e) { if (e && e.code !== 'declined') toast('ส่งออกไม่สำเร็จ: ' + (e.message || e.code)); }
+  }
+
+  // ------------------------------------------------------------ UI wiring
+  function showTab(t) {
+    document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+    document.querySelectorAll('[data-pane]').forEach(p => { p.hidden = p.dataset.pane !== t; });
+    store.set('tab', t);
+    if (t === 'model') {
+      if (!scene3d) loadThree().then(init3d).catch(e => { $('info3d').textContent = 'โหลดโมเดล 3D ไม่สำเร็จ: ' + e.message; });
+      else setTimeout(() => scene3d.resize(), 0);
+    }
+  }
+  function wireUi() {
+    $('tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if (b) showTab(b.dataset.tab); });
+    document.addEventListener('click', e => {
+      const g = e.target.closest('[data-goto]'); if (g) return showTab(g.dataset.goto);
+      const a = e.target.closest('[data-act]'); if (a) return openAct(a.dataset.act);
+      const i = e.target.closest('[data-issue]');
+      if (i && db && canWrite) db.doc('issues/' + i.dataset.issue).update({ status: i.dataset.st, updatedAt: new Date().toISOString() }).catch(er => toast('บันทึกไม่สำเร็จ: ' + (er.message || er.code)));
+    });
+    document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-act][tabindex]')) { e.preventDefault(); openAct(e.target.dataset.act); } });
+    $('statusDate').addEventListener('change', () => { statusDate = $('statusDate').value || todayIso(); store.set('statusDate', $('statusDate').value || null); if (scene3d) reset4d(); render(); });
+    $('dlgPct').addEventListener('input', () => { $('dlgPctV').textContent = $('dlgPct').value + '%'; });
+    $('actForm').addEventListener('submit', e => { if (e.submitter && e.submitter.value === 'save') saveAct(); });
+    $('logForm').addEventListener('submit', async e => {
+      e.preventDefault(); if (!db || !canWrite) return;
+      const rec = { date: $('logDate').value, weather: $('logWeather').value, workers: Number($('logWorkers').value) || 0, trades: $('logTrades').value.trim(),
+        work: $('logWork').value.trim(), problems: $('logProblems').value.trim(), createdAt: new Date().toISOString(), by: await me() };
+      try { await db.collection('logs').add(rec); $('logWork').value = ''; $('logProblems').value = ''; $('logMsg').textContent = 'บันทึกวันที่ ' + thd(rec.date) + ' แล้ว'; }
+      catch (er) { $('logMsg').textContent = 'บันทึกไม่สำเร็จ: ' + (er.message || er.code); }
+    });
+    $('issueForm').addEventListener('submit', async e => {
+      e.preventDefault(); if (!db || !canWrite) return;
+      const rec = { title: $('isTitle').value.trim(), bld: $('isBld').value, act: $('isAct').value, severity: $('isSev').value, owner: $('isOwner').value.trim(),
+        due: $('isDue').value, status: 'open', createdAt: new Date().toISOString(), by: await me() };
+      try { await db.collection('issues').add(rec); $('isTitle').value = ''; $('isMsg').textContent = 'บันทึกปัญหาแล้ว'; }
+      catch (er) { $('isMsg').textContent = 'บันทึกไม่สำเร็จ: ' + (er.message || er.code); }
+    });
+    $('isFilter').addEventListener('change', renderIssues);
+    $('payTable').addEventListener('change', async e => {
+      const s = e.target.closest('select[data-pay]'); if (!s || !db) return;
+      try { await db.doc('payments/' + s.dataset.pay).set({ status: s.value, date: statusDate, updatedAt: new Date().toISOString(), by: await me() }); toast('งวดที่ ' + s.dataset.pay + ': ' + PST[s.value][1]); }
+      catch (er) { toast('บันทึกไม่สำเร็จ: ' + (er.message || er.code)); }
+    });
+    $('boqCat').addEventListener('change', renderBoq); $('boqBld').addEventListener('change', renderBoq);
+    $('mode4d').addEventListener('change', () => { stopPlay(); if (scene3d) setIdx4d($('mode4d').value === 'plan' ? idx4d : idxOf(statusDate)); });
+    $('slider4d').addEventListener('input', () => { stopPlay(); if (scene3d) setIdx4d(Number($('slider4d').value)); });
+    $('play4d').addEventListener('click', () => { if (scene3d) togglePlay(); });
+    $('now4d').addEventListener('click', () => { if (scene3d) reset4d(); });
+    $('exportBtn').addEventListener('click', exportCsv);
+    const t = store.get('tab', 'overview'); if (t !== 'overview') showTab(t);
+  }
+})();
+</script>
