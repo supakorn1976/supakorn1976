@@ -573,13 +573,202 @@ for nm, (x, y), h, r in (('TREE-1', (5.49, 1.63), 5.2, 2.2), ('TREE-2', (19.10, 
         [box(x - .15, x + .15, y - .15, y + .15, 0.0, h + 0.3, 'trunk'),
          I.poly([(a, b, h) for a, b in octagon(x, y, r)], (0, 0, 1), 2.0, 'leaf')], Description='Existing tree (plan) - kept')
 
+# ================================================================== CEILINGS (for take-off; hidden in the preview)
+def slope_ceiling(name, R, x0, x1, ya, yb, mat, desc):
+    """sloped ceiling fixed under the rafters of roof R (ridge along X), between plan lines ya -> yb"""
+    za, zb = under(R, ya) - 0.02, under(R, yb) - 0.02
+    sn = math.hypot(yb - ya, zb - za)
+    add('IfcCovering', name, 'CL', 'GF', 'A-Ceiling', I.poly([(x0, ya, za), (x1, ya, za), (x1, yb, zb), (x0, yb, zb)],
+        (0, -(zb - za) / sn, (yb - ya) / sn) if yb > ya else (0, (zb - za) / sn, (ya - yb) / sn), 0.02, mat),
+        Description=desc, Area_m2=round((x1 - x0) * sn, 2), Item='ceil_bamboo' if mat == 'bamboo' else 'ceil_timber')
+
+
+slope_ceiling('A-CL-N', RA, ABAX, AX1, 7.0, AYN, 'bamboo', 'Woven bamboo ceiling panels on battens, under rafters (photo 23)')
+slope_ceiling('A-CL-S', RA, ABAX, ABX, AYS, 7.0, 'bamboo', 'Woven bamboo ceiling panels on battens, under rafters (photo 23)')
+slope_ceiling('A-CL-SB', RA, ABX, AX1, ABYS, 7.0, 'bamboo', 'Woven bamboo ceiling panels on battens, under rafters (photo 23)')
+add('IfcCovering', 'A-CL-BATH', 'CL', 'GF', 'A-Ceiling', box(AX0, ABAX, ABAY, AYN, A_WTOP - 0.02, A_WTOP, 'ceiling_wr'),
+    Description='Moisture-resistant board ceiling, bathroom', Area_m2=round((ABAX - AX0) * (AYN - ABAY), 2), Item='ceil_wr')
+for nm, x0, x1, y0, y1 in (('C-CL-1', CX0, CXE, CYS, CYN), ('C-CL-2', CXE, CXB, CYM, CYN), ('C-CL-3', CXM, CXE, CYB2, CYS)):
+    add('IfcCovering', nm, 'CL', 'GF', 'A-Ceiling', box(x0, x1, y0, y1, C_WTOP - 0.02, C_WTOP, 'timber'),
+        Description='Timber T&G board ceiling at plate level', Area_m2=round((x1 - x0) * (y1 - y0), 2), Item='ceil_timber')
+
+# ================================================================== MEP: WATER SUPPLY / DRAINAGE (ASSUMED layout - needs MEP design)
+MEP_NOTE = 'MEP layout ASSUMED for estimating - design by a licensed engineer'
+
+
+def run(name, mark, tag, pts, d, mat, item, desc, level='FND', **kw):
+    parts = [I.bar(pts[i], pts[i + 1], max(d, 0.03), max(d, 0.03), mat) for i in range(len(pts) - 1)]
+    ln = sum(math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1))
+    add('IfcPipeSegment' if tag.startswith('P-') else 'IfcCableCarrierSegment', name, mark, level, tag, parts,
+        Description=desc, Length_m=round(ln, 2), Item=item, Note=MEP_NOTE, **kw)
+
+
+def things(ifc, name, mark, tag, pts, size, mat, item, desc, level='GF', **kw):
+    """a group of identical small fixtures at points (x, y, z) - z is the centre"""
+    sx, sy, sz = size
+    parts = [box(x - sx / 2, x + sx / 2, y - sy / 2, y + sy / 2, z - sz / 2, z + sz / 2, mat) for x, y, z in pts]
+    add(ifc, name, mark, level, tag, parts, Description=desc, Count=len(pts), Item=item, Note=MEP_NOTE, **kw)
+
+
+def drum(ifc, name, mark, tag, x, y, r, z0, z1, mat, item, desc, level='GF', **kw):
+    add(ifc, name, mark, level, tag, I.poly([(a, b, z0) for a, b in octagon(x, y, r)], (0, 0, 1), z1 - z0, mat),
+        Description=desc, Count=1, Item=item, Note=MEP_NOTE, **kw)
+
+
+TANK = D_F.p(8.6, 1.0, 0)[:2]                      # east of store room 2, on the drive side
+PUMP = D_F.p(8.6, 2.3, 0)[:2]
+UTIL = (23.5, -15.2)                               # PEA meter pole + PWA water meter at the road (ASSUMED south)
+WZ, DZ, EZ = -0.45, -0.60, -0.65                    # buried depths: water, drain start, power
+
+things('IfcFlowMeter', 'P-METER', 'WM', 'P-Water', [(UTIL[0] + 0.6, UTIL[1], 0.35)], (0.35, 0.25, 0.30), 'equip', 'p_meter',
+       'Water meter 1/2" + gate valve + check valve in box (PWA connection)')
+run('P-SUP-MAIN', 'PE', 'P-Water', [(UTIL[0] + 0.6, UTIL[1], WZ), (24.6, -8.0, WZ), (TANK[0], TANK[1], WZ), (TANK[0], TANK[1], 0.1)],
+    0.032, 'pipe_water', 'pe25', 'HDPE PN10 dia 25 mm buried supply, meter -> tank')
+drum('IfcTank', 'P-TANK', 'TK', 'P-Water', TANK[0], TANK[1], 0.62, 0.15, 1.75, 'tank', 'p_tank',
+     'Polyethylene water tank 2,000 L on 0.15 concrete pad')
+things('IfcPump', 'P-PUMP', 'PU', 'P-Water', [(PUMP[0], PUMP[1], 0.35)], (0.45, 0.35, 0.45), 'equip', 'p_pump',
+       'Constant-pressure booster pump 300 W + pressure tank, roofed housing')
+run('P-SUP-A', 'PPR', 'P-Water', [(PUMP[0], PUMP[1], 0.3), (PUMP[0], PUMP[1], WZ), (16.0, -2.5, WZ), (10.0, 2.8, WZ), (1.5, 2.8, WZ),
+    (1.5, 8.2, WZ), (1.5, 8.2, FFL + 0.5)], 0.032, 'pipe_water', 'ppr25', 'PPR PN20 dia 25 mm cold water main pump -> A bathroom')
+run('P-SUP-A2', 'PPR', 'P-Water', [(8.0, 2.8, WZ), (8.0, 9.55, WZ), (8.0, 9.55, FFL + 0.5)], 0.025, 'pipe_water', 'ppr20',
+    'PPR PN20 dia 20 mm branch to pantry sink')
+run('P-SUP-C', 'PPR', 'P-Water', [(PUMP[0], PUMP[1], WZ), (24.2, -1.0, WZ), (26.0, -1.0, WZ), (26.0, 0.6, WZ), (26.0, 0.6, FFL + 0.5)],
+    0.032, 'pipe_water', 'ppr25', 'PPR PN20 dia 25 mm cold water main pump -> C bathroom 2')
+run('P-SUP-C1', 'PPR', 'P-Water', [(26.0, -1.0, WZ), (28.8, -1.0, WZ), (28.8, 6.4, WZ), (28.8, 6.4, FFL + 0.5)], 0.032, 'pipe_water',
+    'ppr25', 'PPR PN20 dia 25 mm cold water C bathroom 1 + tub deck')
+run('P-HOT', 'PPR', 'P-Water', [(0.15, 8.4, FFL + 1.5), (0.15, 8.4, FFL + 2.0)], 0.025, 'pipe_hot', 'ppr20h',
+    'PPR PN20 dia 20 mm hot water heater -> shower (x3 bathrooms, 3 m each)', level='GF', Count=3)
+things('IfcFlowTerminal', 'P-YARD-TAPS', 'YT', 'P-Water', [(PUMP[0] + 0.4, PUMP[1], 0.6), (17.11, 5.6, 0.6), (-1.2, 6.0, 0.6)],
+       (0.08, 0.08, 0.6), 'equip', 'p_yard', 'Garden tap on post (garage, pergola, A west)')
+add('IfcSanitaryTerminal', 'A-SHOWER', 'SH', 'GF', 'P-Sanitary', box(0.10, 0.20, 7.80, 8.00, FFL + 1.9, FFL + 2.1, 'sanitary'),
+    Description='Rain shower set + mixer', Count=1, Item='san_shower')
+add('IfcSanitaryTerminal', 'C-SHOWERS', 'SH', 'GF', 'P-Sanitary', [box(29.35, 29.45, 7.4, 7.6, FFL + 1.9, FFL + 2.1, 'sanitary'),
+    box(27.36, 27.46, 1.4, 1.6, FFL + 1.9, FFL + 2.1, 'sanitary')], Description='Rain shower set + mixer', Count=2, Item='san_shower')
+add('IfcSanitaryTerminal', 'A-SINK', 'SK', 'GF', 'P-Sanitary', [box(7.20, 9.20, 9.20, 9.80, FFL, FFL + 0.85, 'counter'),
+    box(7.80, 8.40, 9.30, 9.70, FFL + 0.70, FFL + 0.86, 'sanitary')], Description='Pantry counter 2.0 m + stainless sink', Count=1,
+    Item='san_sink')
+things('IfcFlowTerminal', 'P-FD', 'FD', 'P-Drain', [(1.0, 8.0, FFL + 0.01), (28.3, 8.2, FFL + 0.01), (26.0, 1.2, FFL + 0.01), (30.0, 7.0, DECK)],
+       (0.12, 0.12, 0.02), 'equip', 'p_fd', 'Floor drain 4" stainless, with trap')
+# drainage: WC -> septic tank -> soak pit; grey water -> chamber -> soak pit; pantry -> grease trap
+run('P-DR-A-WC', 'PVC', 'P-Drain', [(0.49, 9.4, FFL), (0.49, 9.4, DZ), (0.5, 10.6, DZ - 0.03), (1.0, 11.6, DZ - 0.05)], 0.11,
+    'pipe_drain', 'pvc100', 'PVC class 8.5 dia 100 mm soil pipe, slope 1:50')
+run('P-DR-A-GW', 'PVC', 'P-Drain', [(1.5, 9.5, FFL), (1.5, 9.5, DZ + 0.1), (1.0, 8.0, DZ + 0.1), (1.6, 10.6, DZ), (3.5, 11.8, DZ - 0.1)],
+    0.06, 'pipe_drain', 'pvc55', 'PVC class 8.5 dia 55 mm waste (basin, shower, floor drain)')
+run('P-DR-A-K', 'PVC', 'P-Drain', [(8.1, 9.5, FFL), (8.1, 9.5, DZ + 0.1), (8.1, 10.9, DZ), (3.5, 11.8, DZ - 0.15)], 0.08,
+    'pipe_drain', 'pvc80', 'PVC class 8.5 dia 80 mm pantry -> grease trap -> soak pit')
+run('P-DR-C1', 'PVC', 'P-Drain', [(29.1, 8.99, FFL), (29.1, 8.99, DZ), (29.1, 10.6, DZ - 0.03), (29.8, 11.5, DZ - 0.05)], 0.11,
+    'pipe_drain', 'pvc100', 'PVC class 8.5 dia 100 mm soil pipe, slope 1:50')
+run('P-DR-C2', 'PVC', 'P-Drain', [(24.94, 0.7, FFL), (24.94, 0.7, DZ), (24.94, -0.6, DZ - 0.03), (25.5, -1.8, DZ - 0.05)], 0.11,
+    'pipe_drain', 'pvc100', 'PVC class 8.5 dia 100 mm soil pipe, slope 1:50')
+run('P-DR-C-GW', 'PVC', 'P-Drain', [(28.0, 6.5, DZ + 0.1), (28.3, 8.2, DZ + 0.1), (28.6, 10.6, DZ), (31.5, 11.5, DZ - 0.1)], 0.06, 'pipe_drain', 'pvc55', 'PVC dia 55 mm waste C bathroom 1 + tub deck')
+run('P-DR-C2-GW', 'PVC', 'P-Drain', [(27.1, 0.55, DZ + 0.1), (26.0, 1.2, DZ + 0.1), (26.0, -0.6, DZ), (27.0, -2.0, DZ - 0.1)], 0.06,
+    'pipe_drain', 'pvc55', 'PVC dia 55 mm waste C bathroom 2')
+run('P-DR-EFF', 'PVC', 'P-Drain', [(1.6, 11.6, DZ - 0.3), (3.5, 11.8, DZ - 0.3)], 0.11, 'pipe_drain', 'pvc100',
+    'PVC dia 100 mm septic effluent -> soak pit (x3 tanks, ~2 m each)', Count=3)
+things('IfcDistributionChamberElement', 'P-IC', 'IC', 'P-Drain', [(0.5, 10.6, -0.25), (1.6, 10.6, -0.25), (29.1, 10.6, -0.25),
+       (28.6, 10.6, -0.25), (24.94, -0.6, -0.25), (26.0, -0.6, -0.25)], (0.5, 0.5, 0.6), 'concrete', 'p_ic',
+       'Inspection chamber 0.50 x 0.50 precast + cover', level='FND')
+things('IfcInterceptor', 'P-GT', 'GT', 'P-Drain', [(8.1, 10.9, -0.2)], (0.6, 0.4, 0.5), 'tank', 'p_gt', 'Grease trap 30 L, buried with lid', level='FND')
+for nm, (x, y) in (('A', (1.6, 11.6)), ('C1', (29.8, 11.5)), ('C2', (25.5, -1.8))):
+    drum('IfcTank', 'P-ST-' + nm, 'ST', 'P-Drain', x, y, 0.62, -1.75, 0.05, 'tank', 'p_septic',
+         'Precast septic tank 1,600 L (anaerobic + aerobic), buried', level='FND')
+for nm, (x, y) in (('A', (3.5, 11.8)), ('C1', (31.5, 11.5)), ('C2', (27.0, -2.0))):
+    drum('IfcTank', 'P-SP-' + nm, 'SP', 'P-Drain', x, y, 0.6, -2.0, -0.2, 'gravel', 'p_soak',
+         'Soak pit dia 1.20 x 1.80, concrete rings + gravel', level='FND')
+
+# ================================================================== MEP: ELECTRICAL (ASSUMED layout - needs electrical design)
+MDB = D_F.p(6.95, 1.6, 0)[:2]                      # inside store room 2, east wall
+CUA = (2.16, 8.5)                                  # living side of bathroom partition
+CUC = (21.64, 5.0)                                 # C west wall, inside
+add('IfcElectricDistributionPoint', 'E-POLE', 'MP', 'GF', 'E-Power', [I.bar((UTIL[0], UTIL[1], -1.0), (UTIL[0], UTIL[1], 6.0), 0.18, 0.18, 'concrete'),
+    box(UTIL[0] - 0.2, UTIL[0] + 0.2, UTIL[1] - 0.15, UTIL[1] - 0.09, 1.4, 1.9, 'elec')],
+    Description='Concrete pole 6.0 m + PEA kWh meter 15(45)A 3-phase 4-wire (ASSUMED supply)', Count=1, Item='e_meter', Note=MEP_NOTE)
+things('IfcElectricDistributionPoint', 'E-MDB', 'MDB', 'E-Power', [(MDB[0], MDB[1], 1.5)], (0.45, 0.45, 0.6), 'elec', 'e_mdb',
+       'MDB load centre 3-phase, main MCCB 3P 63A + RCBO, 12 ways')
+things('IfcElectricDistributionPoint', 'E-CU-A', 'CU', 'E-Power', [(CUA[0], CUA[1], FFL + 1.5)], (0.08, 0.35, 0.45), 'elec', 'e_cu',
+       'Consumer unit 1-phase main 63A + RCBO, 10 ways (building A)')
+things('IfcElectricDistributionPoint', 'E-CU-C', 'CU', 'E-Power', [(CUC[0], CUC[1], FFL + 1.5)], (0.08, 0.35, 0.45), 'elec', 'e_cu',
+       'Consumer unit 1-phase main 63A + RCBO, 12 ways (building C)')
+run('E-FD-MAIN', 'UG', 'E-Power', [(UTIL[0], UTIL[1], EZ), (23.4, -8.0, EZ), (MDB[0], MDB[1], EZ), (MDB[0], MDB[1], 1.2)], 0.06, 'conduit',
+    'e_fd_main', 'Main feeder NYY 4x25 mm2 in HDPE 50 mm, buried 0.65 m, sand bed + warning tape')
+run('E-FD-A', 'UG', 'E-Power', [(MDB[0], MDB[1], EZ), (16.5, -2.2, EZ), (10.5, 2.5, EZ), (2.6, 2.5, EZ), (2.6, 8.5, EZ), (CUA[0], CUA[1], EZ),
+    (CUA[0], CUA[1], FFL + 1.3)], 0.05, 'conduit', 'e_fd_sub16', 'Sub-feeder NYY 2x16 + G 10 mm2 in HDPE 40 mm, MDB -> CU-A')
+run('E-FD-C', 'UG', 'E-Power', [(MDB[0], MDB[1], EZ), (21.0, -1.0, EZ), (21.0, 5.0, EZ), (CUC[0], CUC[1], EZ), (CUC[0], CUC[1], FFL + 1.3)],
+    0.05, 'conduit', 'e_fd_sub25', 'Sub-feeder NYY 2x25 + G 16 mm2 in HDPE 40 mm, MDB -> CU-C')
+run('E-FD-SITE', 'UG', 'E-Power', [(MDB[0], MDB[1], EZ), (16.0, -2.4, EZ), (13.6, -1.9, EZ), (8.4, 0.9, EZ), (4.0, 3.2, EZ),
+    (17.3, 2.0, EZ), (21.0, 2.0, EZ)], 0.04, 'conduit', 'e_fd_site', 'Garden lighting NYY 3x2.5 mm2 in HDPE 25 mm')
+run('E-FD-PUMP', 'UG', 'E-Power', [(MDB[0], MDB[1], EZ), (PUMP[0], PUMP[1], EZ), (PUMP[0], PUMP[1], 0.3)], 0.04, 'conduit', 'e_fd_pump',
+    'Pump circuit NYY 3x2.5 mm2 in HDPE 25 mm')
+things('IfcElectricDistributionPoint', 'E-EARTH', 'GR', 'E-Power', [(UTIL[0] + 0.5, UTIL[1] + 0.5, -1.4), (MDB[0], MDB[1], -1.4),
+       (CUA[0] - 0.6, 11.0, -1.4), (CUC[0] - 1.3, 5.0, -1.4)], (0.02, 0.02, 2.4), 'copper', 'e_earth',
+       'Ground rod copper-clad 5/8" x 2.4 m + test box', level='FND')
+
+# lighting (points; z = fixture centre)
+zA = lambda y: under(RA, y) - 0.05
+things('IfcLightFixture', 'E-L-A-PEND', 'LP', 'E-Lighting', [(4.3, 7.55, FFL + 2.15), (5.1, 7.55, FFL + 2.15), (5.9, 7.55, FFL + 2.15)],
+       (0.5, 0.5, 0.12), 'light', 'l_pend', 'Pendant (paper shade) LED E27 12 W, over dining (photo 23)', Circuit='A-L1')
+things('IfcLightFixture', 'E-L-A-DL', 'LD', 'E-Lighting', [(x, y, zA(y)) for x in (2.8, 7.4, 8.8) for y in (6.4, 8.6)] +
+       [(x, y, zA(y)) for x in (10.2, 11.5) for y in (6.6, 8.6)] + [(1.0, 8.0, A_WTOP - 0.05), (1.0, 9.2, A_WTOP - 0.05)],
+       (0.12, 0.12, 0.06), 'light', 'l_down', 'LED downlight 9 W 3000K recessed in bamboo ceiling', Circuit='A-L1')
+things('IfcLightFixture', 'E-L-A-WALL', 'LW', 'E-Lighting', [(x + 0.12, AYV, 2.45) for x in (AX0, ABAX, 4.425, 6.875)] +
+       [(-0.05, 7.0, 2.45), (ABX - 0.08, 4.8, 2.45)], (0.1, 0.12, 0.25), 'light', 'l_wall', 'Outdoor wall/post lamp IP54 LED 7 W (photo 17)',
+       Circuit='A-L2')
+things('IfcLightFixture', 'E-L-C', 'LD', 'E-Lighting', [(22.8, 7.8, C_WTOP - 0.05), (25.9, 7.8, C_WTOP - 0.05), (23.0, 3.3, C_WTOP - 0.05),
+       (23.0, 4.9, C_WTOP - 0.05), (26.0, 3.3, C_WTOP - 0.05), (26.0, 4.9, C_WTOP - 0.05), (28.5, 7.0, C_WTOP - 0.05), (28.5, 8.6, C_WTOP - 0.05),
+       (25.5, 1.1, C_WTOP - 0.05), (26.8, 1.1, C_WTOP - 0.05)], (0.12, 0.12, 0.06), 'light', 'l_down', 'LED downlight 9 W 3000K', Circuit='C-L1')
+things('IfcLightFixture', 'E-L-C-WALL', 'LW', 'E-Lighting', [(21.9, CYS - 0.1, 2.4), (24.2, CYS - 0.1, 2.4), (CXK + 0.18, 3.46, 2.3),
+       (CXK + 0.18, CYM, 2.3), (CXK + 0.18, CYN, 2.3), (CXB + 0.08, 8.0, 2.3), (21.6, 8.6, FFL + 1.8), (24.5, 8.6, FFL + 1.8)],
+       (0.1, 0.12, 0.25), 'light', 'l_wall', 'Wall lamp LED 7 W (porch, side walk, tub deck, bed heads)', Circuit='C-L2')
+dl = lambda a, b, z: D_F.p(a, b, z)
+things('IfcLightFixture', 'E-L-D-BAT', 'LB', 'E-Lighting', [dl(a, b, D_PLATE - 0.3) for a in (2.0, 5.9) for b in (4.5, 6.5, 8.5)],
+       (0.15, 0.15, 0.08), 'light', 'l_batten', 'LED batten 1.2 m 18 W IP65 (garage, on cross beams)', level='GF', Circuit='D-L1')
+things('IfcLightFixture', 'E-L-D-IN', 'LD', 'E-Lighting', [dl(1.45, 1.7, RZ1 - 0.05), dl(5.45, 1.7, RZ1 - 0.05), dl(3.3, 1.7, RZ1 - 0.05)],
+       (0.12, 0.12, 0.06), 'light', 'l_down', 'LED downlight / linear light (store rooms, corridor - Rungkit11)', Circuit='D-L1')
+things('IfcLightFixture', 'E-L-D-FL', 'LF', 'E-Lighting', [dl(7.9, 3.4, 2.4), dl(7.9, 8.0, 2.4)], (0.2, 0.15, 0.15), 'light', 'l_flood',
+       'LED floodlight 30 W IP65 with photocell (drive)', Circuit='D-L2')
+ux, uy = (13.95 - 3.98), (-1.68 - 3.62)
+ul = math.hypot(ux, uy)
+bol = [(3.98 + ux * t - uy / ul * 0.6, 3.62 + uy * t + ux / ul * 0.6, 0.35) for t in (0.1, 0.4, 0.7, 0.95)]
+bol += [(18.0, 2.0, 0.35), (20.0, 2.0, 0.35), (16.2, 5.8, 0.35), (16.2, 9.2, 0.35)]
+things('IfcLightFixture', 'E-L-SITE', 'LG', 'E-Lighting', bol, (0.12, 0.12, 0.7), 'light', 'l_bollard', 'Garden bollard LED 5 W IP65, 0.70 h',
+       Circuit='MDB-SITE')
+things('IfcLightFixture', 'E-L-PG', 'LS', 'E-Lighting', [(14.72, 5.81, 2.3), (17.11, 5.81, 2.3), (19.51, 5.81, 2.3)], (0.15, 0.15, 0.2),
+       'light', 'l_wall', 'Pergola post lamp IP54 LED 7 W', Circuit='MDB-SITE')
+# sockets / switches / equipment
+sock = lambda pts: [(x, y, FFL + 0.35) for x, y in pts]
+things('IfcOutlet', 'E-S-A', 'SO', 'E-Power', sock([(2.2, 6.0), (2.2, 7.0), (4.425, 9.75), (6.875, 9.75), (9.33, 6.2), (9.33, 8.9), (7.5, 9.7),
+       (8.9, 9.7), (9.55, 9.75), (12.2, 6.0), (12.2, 8.8), (1.9, 9.75)]), (0.08, 0.08, 0.12), 'elec', 'e_sock',
+       'Duplex socket 16A with earth, conduit EMT/PVC 20 mm + THW 2.5 mm2 (avg 8 m/point)', Circuit='A-S1/S2')
+things('IfcOutlet', 'E-S-C', 'SO', 'E-Power', sock([(21.64, 3.0), (24.49, 4.0), (21.64, 7.6), (22.4, 9.33), (24.0, 9.33), (27.46, 7.6), (26.0, 9.33),
+       (27.46, 3.0), (27.46, 5.2), (24.69, 2.6), (28.0, 6.2), (25.2, 0.3)]), (0.08, 0.08, 0.12), 'elec', 'e_sock',
+       'Duplex socket 16A with earth', Circuit='C-S1/S2')
+things('IfcOutlet', 'E-S-D', 'SO', 'E-Power', [dl(a, b, 0.5) for a, b in ((0.25, 4.0), (0.25, 8.0), (2.65, 1.0), (4.0, 2.4), (7.75, 5.0), (7.75, 9.0))],
+       (0.08, 0.08, 0.12), 'elec', 'e_sock', 'Duplex socket 16A with earth, surface conduit', Circuit='D-S1')
+things('IfcOutlet', 'E-S-EXT', 'SW', 'E-Power', [(-0.05, 9.0, FFL + 0.6), (14.72, 2.3, 0.6), (CXB + 0.08, 7.4, FFL + 0.6)], (0.1, 0.1, 0.14),
+       'elec', 'e_sock_ip', 'Weatherproof socket IP55 with RCD', Circuit='A-S2/MDB-SITE/C-S2')
+things('IfcSwitchingDevice', 'E-SW', 'SW', 'E-Lighting', [(2.15, 5.7, FFL + 1.2), (2.15, 7.1, FFL + 1.2), (9.33, 5.6, FFL + 1.2),
+       (9.53, 6.7, FFL + 1.2), (1.9, 7.4, FFL + 1.2), (0.1, 6.9, FFL + 1.2), (9.33, 4.2, FFL + 1.2), (21.64, 4.9, FFL + 1.2), (22.9, 6.2, FFL + 1.2),
+       (24.69, 5.8, FFL + 1.2), (27.46, 6.9, FFL + 1.2), (26.9, 2.13, FFL + 1.2), (22.1, 2.13, FFL + 1.2), (29.45, 7.8, FFL + 1.2),
+       (21.64, 3.5, FFL + 1.2), dl(2.65, 1.4, 1.3), dl(4.0, 1.6, 1.3), dl(7.75, 3.6, 1.3), dl(0.25, 3.6, 1.3)], (0.08, 0.04, 0.12), 'elec',
+       'e_switch', 'Light switch 1-2 gang, avg 6 m conduit + THW 1.5 mm2 to fixtures')
+things('IfcElectricAppliance', 'E-WH', 'WH', 'E-Power', [(0.12, 8.4, FFL + 1.6), (29.45, 8.6, FFL + 1.6), (27.46, 1.2, FFL + 1.6)],
+       (0.1, 0.25, 0.4), 'equip', 'e_wh', 'Instant water heater 4,500 W + 2P 32A RCBO circuit THW 6 mm2', Circuit='A-WH/C-WH1/C-WH2')
+things('IfcUnitaryEquipment', 'E-AC-IN', 'AC', 'E-Power', [(11.0, AYN - 0.15, 2.45), (23.0, CYN - 0.15, 2.4), (CXE - 0.15, 4.0, 2.4)],
+       (0.8, 0.22, 0.28), 'equip', 'e_ac', 'Split AC 12,000 BTU inverter (fan coil), circuit 20A THW 4 mm2 + pipe set 4 m', Circuit='A-AC/C-AC1/C-AC2')
+things('IfcUnitaryEquipment', 'E-AC-OUT', 'CDU', 'E-Power', [(11.0, AYN + 0.6, 0.4), (26.0, CYN + 0.55, 0.4), (CXE + 0.55, 4.0, 0.4)],
+       (0.7, 0.3, 0.55), 'equip', 'e_ac_cdu', 'AC condensing unit on concrete pad')
+
+
 # ------------------------------------------------------------------ output
 MATS = {
     'timber': [150, 96, 58, 1.0], 'timber_dark': [104, 68, 42, 1.0], 'timber_v': [140, 92, 56, 1.0], 'deck': [158, 102, 62, 1.0],
     'roof_sheet': [178, 182, 184, 1.0], 'concrete': [190, 188, 182, 1.0], 'concrete_floor': [206, 202, 194, 1.0],
     'plaster': [232, 228, 218, 1.0], 'glass': [159, 195, 210, 0.35], 'frame_alu': [150, 152, 150, 1.0],
     'gabion': [132, 122, 108, 1.0], 'stone': [150, 140, 126, 1.0], 'gravel': [196, 190, 176, 1.0], 'ground': [126, 160, 92, 1.0],
-    'sanitary': [250, 250, 250, 1.0], 'trunk': [96, 78, 60, 1.0], 'leaf': [96, 146, 74, 0.55]}
+    'sanitary': [250, 250, 250, 1.0], 'trunk': [96, 78, 60, 1.0], 'leaf': [96, 146, 74, 0.55],
+    'pipe_water': [40, 110, 200, 1.0], 'pipe_hot': [200, 60, 50, 1.0], 'pipe_drain': [140, 140, 150, 1.0], 'conduit': [235, 125, 35, 1.0],
+    'elec': [210, 210, 205, 1.0], 'light': [255, 214, 90, 1.0], 'equip': [236, 236, 236, 1.0], 'tank': [40, 80, 140, 1.0],
+    'copper': [184, 115, 51, 1.0], 'bamboo': [196, 170, 120, 1.0], 'ceiling_wr': [240, 240, 236, 1.0], 'counter': [120, 116, 112, 1.0]}
 
 
 def rb(v):
