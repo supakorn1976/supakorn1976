@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Baan Sao Yong Hin BIM</title>
+<style>
+:root{--bg:#EEF1F0;--surface:#fff;--ink:#15201C;--muted:#56655F;--line:#D3DBD8;--accent:#1D5C86;--scene:#dfe8ee}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101614;--surface:#172020;--ink:#E4EBE8;--muted:#9AABA4;--line:#2C3A37;--accent:#6FAED8;--scene:#1A2322}}
+:root[data-theme="dark"]{--bg:#101614;--surface:#172020;--ink:#E4EBE8;--muted:#9AABA4;--line:#2C3A37;--accent:#6FAED8;--scene:#1A2322}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,"Leelawadee UI",Tahoma,sans-serif}
+header{padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+header b{font-size:16px}
+header p{margin:2px 0 0;color:var(--muted);font-size:12.5px}
+.tools{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line)}
+.tools label{display:flex;gap:4px;align-items:center;font-size:13px;cursor:pointer}
+button{font:inherit;color:inherit;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+#view{position:relative;height:calc(100vh - 140px);min-height:360px;background:var(--scene)}
+#view canvas{display:block;width:100%;height:100%}
+#info{position:absolute;right:10px;top:10px;max-width:min(340px,calc(100% - 20px));max-height:calc(100% - 20px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:12.5px}
+#info:empty{display:none}
+#info dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px;margin:6px 0 0}
+#info dt{color:var(--muted)} #info dd{margin:0;word-break:break-word}
+</style>
+</head>
+<body>
+<header><b>บ้านเสายงหิน (Baan Sao Yong Hin) — BIM 3D</b>
+<p>ผังจากแบบที่มีสเกล 10 ม. · ความสูง/โครงสร้างประมาณจากภาพถ่าย · คลิกชิ้นส่วนเพื่อดูข้อมูล · ลากหมุน / ล้อเลื่อนซูม / คลิกขวาเลื่อน</p></header>
+<div class="tools" id="tools">
+  <button data-cam="iso">ไอโซ</button><button data-cam="sw">มุมภาพปก (SW)</button><button data-cam="ne">มุม NE</button><button data-cam="top">แปลน</button>
+  <span id="tags"></span>
+</div>
+<div id="view"><div id="info"></div></div>
+<script src="../../web/house-bim-studio/vendor/three.min.js"></script>
+<script src="../../web/house-bim-studio/vendor/OrbitControls.js"></script>
+<script src="model.js"></script>
+<script>
+(function () {
+  'use strict';
+  const M = window.MODEL, view = document.getElementById('view'), info = document.getElementById('info');
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  view.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--scene').trim() || '#dfe8ee');
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 800);
+  camera.up.set(0, 0, 1);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8a80, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(-20, -30, 40); scene.add(sun);
+
+  const mats = {};
+  for (const [k, [r, g, b, a]] of Object.entries(M.mats)) {
+    mats[k] = new THREE.MeshLambertMaterial({ color: new THREE.Color(r / 255, g / 255, b / 255), transparent: a < 1, opacity: a,
+      depthWrite: a >= 1, side: THREE.DoubleSide });
+  }
+  const edgeMat = new THREE.LineBasicMaterial({ color: 0x33403b, transparent: true, opacity: 0.22 });
+  const V = (a) => new THREE.Vector3(a[0], a[1], a[2]);
+
+  // [:poly, pts, n, t] -> prism: face pts extruded by t along n (same as the SketchUp engine)
+  function polyGeo(pts, n, t) {
+    const nn = V(n).normalize().multiplyScalar(t);
+    const lo = pts.map(V), hi = lo.map(p => p.clone().add(nn)), k = lo.length, pos = [];
+    const tri = (a, b, c) => pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    for (let i = 1; i < k - 1; i++) { tri(lo[0], lo[i + 1], lo[i]); tri(hi[0], hi[i], hi[i + 1]); }
+    for (let i = 0; i < k; i++) { const j = (i + 1) % k; tri(lo[i], lo[j], hi[j]); tri(lo[i], hi[j], hi[i]); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    return g;
+  }
+  // [:bar, p1, p2, b, h] -> box between p1 and p2; b horizontal, h in the vertical plane (engine convention)
+  function barMesh(p, mat) {
+    const a = V(p[1]), b = V(p[2]), u = b.clone().sub(a), len = u.length();
+    u.normalize();
+    let side = u.clone().cross(new THREE.Vector3(0, 0, 1));
+    if (side.length() < 1e-6) side = new THREE.Vector3(1, 0, 0);
+    side.normalize();
+    const up = side.clone().cross(u).normalize();
+    if (up.z < 0) up.negate();
+    const geo = new THREE.BoxGeometry(p[3], p[4], len);
+    const m = new THREE.Mesh(geo, mat);
+    m.matrixAutoUpdate = false;
+    m.matrix.makeBasis(side, up, u).setPosition(a.clone().add(b).multiplyScalar(0.5));
+    return m;
+  }
+
+  const byTag = {}, pickables = [];
+  for (const e of M.elements) {
+    const g = new THREE.Group(); g.userData.el = e;
+    for (const p of e.parts) {
+      const mk = p[p.length - 1], mat = mats[mk] || mats.concrete;
+      let mesh;
+      if (p[0] === 'box') {
+        const [, x0, x1, y0, y1, z0, z1] = p;
+        mesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), mat);
+        mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+      } else if (p[0] === 'poly') {
+        mesh = new THREE.Mesh(polyGeo(p[1], p[2], p[3]), mat);
+      } else if (p[0] === 'bar') {
+        mesh = barMesh(p, mat);
+      } else continue;
+      mesh.userData.el = e;
+      if (mk !== 'glass' && mk !== 'leaf' && p[0] !== 'bar') mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry, 20), edgeMat));
+      g.add(mesh); pickables.push(mesh);
+    }
+    scene.add(g);
+    (byTag[e.tag] = byTag[e.tag] || []).push(g);
+  }
+  const hidden = new Set(['A-Ceiling']);
+  const qs = new URLSearchParams(location.search);
+  (qs.get('hide') || '').split(',').filter(Boolean).forEach(t => hidden.add(t));
+  document.getElementById('tags').innerHTML = Object.keys(byTag).sort().map(t =>
+    `<label><input type="checkbox" data-tag="${esc(t)}" ${hidden.has(t) ? '' : 'checked'}>${esc(t)}</label>`).join(' ');
+  const applyTags = () => document.querySelectorAll('[data-tag]').forEach(cb => byTag[cb.dataset.tag].forEach(g => { g.visible = cb.checked; }));
+  applyTags();
+  document.getElementById('tools').addEventListener('change', applyTags);
+
+  const target = new THREE.Vector3(15, 1, 2);
+  const cams = { iso: [-6, -30, 24], sw: [-6, -26, 6], ne: [40, 26, 18], top: [13, -0.01, 52] };
+  function setCam(k) { camera.position.set(...cams[k]); controls.target.copy(k === 'top' ? new THREE.Vector3(13, 0, 0) : target); controls.update(); }
+  document.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click', () => setCam(b.dataset.cam)));
+  setCam(cams[qs.get('cam')] ? qs.get('cam') : 'iso');
+
+  const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+  let downAt = null;
+  renderer.domElement.addEventListener('pointerdown', ev => { downAt = [ev.clientX, ev.clientY]; });
+  renderer.domElement.addEventListener('pointerup', ev => {
+    if (!downAt || Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 4) return;
+    const r = renderer.domElement.getBoundingClientRect();
+    mouse.set((ev.clientX - r.left) / r.width * 2 - 1, -(ev.clientY - r.top) / r.height * 2 + 1);
+    ray.setFromCamera(mouse, camera);
+    const hit = ray.intersectObjects(pickables.filter(m => m.parent.visible), false)[0];
+    if (!hit) { info.innerHTML = ''; return; }
+    const e = hit.object.userData.el;
+    info.innerHTML = `<b>${esc(e.name)}</b><dl><dt>IFC</dt><dd>${esc(e.ifc)}</dd><dt>Mark</dt><dd>${esc(e.mark)}</dd><dt>ชั้น</dt><dd>${esc(e.level)}</dd><dt>Tag</dt><dd>${esc(e.tag)}</dd>` +
+      Object.entries(e.attrs).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('') + '</dl>';
+  });
+
+  function resize() { const w = view.clientWidth, h = view.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  window.addEventListener('resize', resize); resize();
+  (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+})();
+</script>
+</body>
+</html>
