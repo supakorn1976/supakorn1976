@@ -12,15 +12,16 @@ reclaimed door (D01–D20) and window (W01–W12) schedules, a door and window a
 | `BaanSaoYongHin_BIM.rb` | SketchUp Ruby script (generated): `load` it, then `BaanSaoYongHinBIM.build` |
 | `model.js` + `preview.html` | Browser 3D preview (generated data, three.js from `../../web/house-bim-studio/vendor`) |
 | `boq.py` | Take-off from the model → BOQ → CPM plan → S-curve → payments |
-| `design_calc.py`, `design_report.py` | Preliminary foundation design and electrical load calculation from the model → `design/design_results.json` + `design/design_report.pdf` (Thai) |
-| `run_all.py` | Rebuild everything in order: model → design → model with designed sizes → BOQ → report |
+| `design_calc.py`, `design_report.py` | Preliminary design from the model (foundations, timber superstructure, electrical load) → `design/design_results.json` + `design/design_report.pdf` (Thai, 15 pages) |
+| `drawings.py` | 2D drawing set → `design/BaanSaoYongHin_Drawings.pdf` (A3, 6 sheets, Thai title blocks) |
+| `run_all.py` | Rebuild everything in order: model → design → model (twice, sizes settle) → BOQ → report → drawings |
 | `BaanSaoYongHin_BOQ_Plan.xlsx` | สรุป (ปร.5), BOQ (ปร.4, formulas), ถอดปริมาณ (every quantity traced to a BIM element), ประตูหน้าต่าง, แผนงาน (CPM + Gantt), S-Curve, งวดงาน, ข้อสมมติ |
 | `tracker/` | Construction tracker web app (`index.html` + generated `plan.js`); see below |
 | `door_window_schedule.csv` | The 32 reclaimed marks (40 physical units) with sizes, pieces available, placed, spare, and where each is used |
 | `preview_*.png` | Screenshots of the preview (SW, iso, plan) |
 | `reference/` | The source sheets used: scaled site plan, door/window schedules, door/window axonometric |
 
-## What is in the model (423 elements)
+## What is in the model (450 elements)
 
 | Building | Contents |
 |---|---|
@@ -45,8 +46,8 @@ must design them (EIT standards) before construction.
 
 | | |
 |---|---|
-| Direct cost | 2,893,987 baht (structure 1.10 M, architecture 1.24 M, plumbing 0.23 M, electrical 0.32 M) |
-| × Factor F 1.2846 | **3,717,616 baht** ≈ 18,886 baht/m² of building slab (196.85 m², decks extra) |
+| Direct cost | 2,979,605 baht (structure 1.18 M, architecture 1.24 M, plumbing 0.23 M, electrical 0.32 M) |
+| × Factor F 1.2846 | **3,827,601 baht** ≈ 19,444 baht/m² of building slab (196.85 m², decks extra) |
 | Plan | 36 activities, 98 working days (Mon–Sat, listed public holidays off), 2 Nov 2026 → 1 Mar 2027 |
 | Payments | 8 milestone payments, each valued at the cost of the activities it closes |
 
@@ -66,12 +67,23 @@ cable routes) and write the results back into the model and BOQ.
 
 - Column loads by tributary area: roof sheets, rafters and purlins, ceilings, walls, doors/windows and timber
   beams are weighed from the model and given to the nearest supporting post. Loads are small (D + Lr ≤ 34 kN).
-- All 49 pad footings: **F1 0.70 × 0.70 × 0.25 m, 4-DB12 @0.18 each way with 90° hooks**, base at −1.20 m
+- All 52 pad footings (incl. 3 garage centre posts): **F1 0.70 × 0.70 × 0.25 m, 4-DB12 @0.18 each way with 90° hooks**, base at −1.20 m
   (bearing ≤ 92 kPa, punching, one-way shear, flexure and hook development all checked).
 - RC stumps 0.20 × 0.20 with 4-DB12 and RB9 @0.15; grade beams 0.20 × 0.40 with 3-DB12 top and bottom and RB6 @0.15.
 - Wind uplift (V50 25 m/s, open garage CgCp −2.0) is resisted by footing + soil weight on every post; post-to-stump
   connection: 2 steel side plates + 2 M12 through-bolts. Deck piers on 0.40 × 0.40 pads.
-- Rebar now comes from the design (1,379 kg) instead of kg/m³ ratios.
+- Rebar now comes from the design instead of kg/m³ ratios.
+
+**Timber superstructure** (allowable stress design, reclaimed hardwood at 80 % of new-hardwood stresses):
+
+- Roofs A and C get a **king-post truss (ขื่อ-ดั้ง-ตะเกียบ) on every post line**, so ridge beams span ≤ 4.1 m;
+  the garage gets **centre posts under the tie beams** (as in photo Rungkit07) and the clerestory posts stand on the ties.
+- The script picks the smallest passing section per member group and writes it back into the model:
+  purlins 50×75 @0.80, rafters 50×125 @1.0, ridge/head beams 100×200, ties 100×250 (pair), king posts 100×100,
+  struts 50×100, knee braces 50×100 (garage, veranda, side walk, pergola).
+- Checked: bending, shear, deflection L/240, uplift reversal (0.6D − W), plates on posts, posts (EIT column formula,
+  wind bending on knee-braced frames), knee-brace force and bolts, wall racking (2 let-in diagonal braces per wall
+  line), rafter hold-down straps.
 
 **Electrical** (EIT wiring standard approach):
 
@@ -81,9 +93,23 @@ cable routes) and write the results back into the model and BOQ.
   water heaters 6 mm² on 32 A RCBO; worst total voltage drop 3.1 % (limit 5 %).
 
 **Not covered yet / to be confirmed:** no soil data (qa = 100 kPa is assumed: a soil test must confirm it);
-the timber superstructure (posts, beams, rafters, lateral bracing) is not designed; cable ampacities and
+the species, moisture and strength of the reclaimed timber must be confirmed (tests) before using these sizes; cable ampacities and
 grounding sizes must be checked against the current EIT tables and the meter size confirmed with PEA. A licensed
 civil and electrical engineer must check and sign before construction.
+
+## Drawings (`drawings.py` → `design/BaanSaoYongHin_Drawings.pdf`)
+
+Vector A3 sheets drawn from the model coordinates and the design results, with Thai title blocks, a
+"preliminary - not for construction" stamp and empty signature boxes for the architect and engineers:
+
+| Sheet | Content |
+|---|---|
+| S-01 | Foundation plan 1:125: footings, stumps, grade beams, deck piers, pergola boulders, key dimensions |
+| S-02 | Details: footing F1 plan + section 1:20, stump, grade beam section 1:10, post-to-stump connection, footing schedule |
+| S-03 | Roof framing sections (A, C-W 1:50; D, C-E 1:75) with ties, king posts, struts, knee braces + timber member schedule |
+| E-01 | Single line diagram: PEA → meter → MDB → feeders → CU-A / CU-C, every breaker, RCD and cable |
+| E-02 | Load schedules for MDB, CU-A, CU-C with per-phase VA and currents |
+| E-03 | Electrical layout 1:125: lights (with circuit numbers), sockets, switches, boards, buried feeder routes |
 
 ## Construction tracker (`tracker/index.html`)
 
@@ -111,8 +137,7 @@ recorded actual start/finish dates), daily site reports, issues and defects, pay
 - **Heights and roof pitches: estimated** from photos. Floor +0.45, wall plate +3.10 (A) / +2.95 (C) /
   +2.70 (D), pitches 30° / 45° / 25°.
 - **Foundations: preliminary design** (see above), based on an assumed bearing capacity.
-- **Timber superstructure: assumed.** Timber posts 0.15–0.20, rafters 50×150 @ about 1.0 m, purlins 50×100 @ 0.80
-  have not been designed. A structural engineer must set the real sizes before this is used for permits or construction.
+- **Timber superstructure: preliminary design** (see above), on assumed allowable stresses for reclaimed hardwood.
 - `Gemini_Generated_Image_*.png` in the archive shows a different flat-roof house, so it is not modelled.
 
 ## Commands in SketchUp (Ruby Console)

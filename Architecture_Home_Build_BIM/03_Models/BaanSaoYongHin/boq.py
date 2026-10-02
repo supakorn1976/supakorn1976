@@ -196,6 +196,7 @@ ITEMS = {
     'tm_roof': (S, '1.4 งานโครงสร้างไม้', 'จันทัน แป อกไก่ ไม้เนื้อแข็งเก่า', 'ลบ.ฟ.', 650, 220, 10, 'RF-{b}'),
     'tm_steel': (S, '1.4 งานโครงสร้างไม้', 'เหล็กประกับ สลักเกลียว พุก (25 กก./ลบ.ม.ไม้)', 'กก.', 60, 20, 5, 'TS-{b}'),
     'tm_treat': (S, '1.4 งานโครงสร้างไม้', 'อาบน้ำยากันปลวก-กันเชื้อรา ไม้โครงสร้าง', 'ลบ.ฟ.', 30, 10, 0, 'TS-{b}'),
+    'wl_brace': (S, '1.4 งานโครงสร้างไม้', 'ค้ำยันทแยงในผนัง 50x100 (ต้านแรงลมด้านข้าง) + สลัก M12 2 ตัว/ปลาย', 'ชุด', 450, 250, 0, 'WL-{b}'),
     'gabion': (S, '1.5 งานกำแพง', 'กำแพงกาเบียน ตะแกรงเหล็กชุบสังกะสี + หินแม่น้ำ', 'ลบ.ม.', 1400, 500, 5, 'WL-{b}'),
     # ---- architecture
     'wl_frame': (A, '2.1 งานผนัง', 'โครงผนังไม้ (เคร่า) 2"x3" @0.40', 'ตร.ม.', 220, 120, 5, 'WL-{b}'),
@@ -456,6 +457,9 @@ for e in E:                                # ridge caps / flashing from ridge be
 put('rf_flash', 'C', 10.4, basis='C-W / C-E roof step (valley flashing)')
 tim_ext = sum(q for (k, bb), q in Q.items() if k in ('tm_post', 'tm_beam')) / FT3 * 16
 put('stain_ext', 'S', tim_ext, basis='exposed posts/beams ~16 m2 per m3')
+if DESIGN.get('timber'):
+    for bb, n in (('A', 12), ('C', 16)):
+        put('wl_brace', bb, n, basis='racking check: 2 diagonal braces per wall line (design_calc.py)')
 put('clean', 'S', 1, basis='lump sum'); put('asbuilt', 'S', 1, basis='lump sum')
 put('p_test', 'S', 1, basis='lump sum'); put('e_test', 'S', 1, basis='lump sum')
 

@@ -197,7 +197,15 @@ class Roof:
     pass
 
 
-SHEET, PURLIN_H, RAFTER_H = 0.03, 0.10, 0.15
+# timber sections (b, h) in m: defaults, replaced by the preliminary timber design when design_results.json has it
+TS = {'purlin': (0.05, 0.10), 'rafter': (0.05, 0.15), 'ridge': (0.10, 0.20), 'tie': (0.10, 0.15), 'kingpost': (0.10, 0.10),
+      'strut': (0.05, 0.10), 'brace': (0.10, 0.10)}
+TS.update({k: tuple(v) for k, v in DESIGN.get('timber', {}).get('sections', {}).items()})
+mmx = lambda k: '%dx%d' % (TS[k][0] * 1000, TS[k][1] * 1000)
+SHEET = 0.03
+PURLIN_B, PURLIN_H = TS['purlin']
+RAFTER_B, RAFTER_H = TS['rafter']
+RIDGE_B, RIDGE_H = TS['ridge']
 
 
 def gable_roof(F, key, ridge, s0, s1, r0, r1, ze, pitch, gap=0.0, step=1.0, desc=''):
@@ -231,9 +239,9 @@ def gable_roof(F, key, ridge, s0, s1, r0, r1, ze, pitch, gap=0.0, step=1.0, desc
             d = min(i * 0.8, slope_len - 0.05) * cs
             s = se + sg * d
             z = ze + d * R.tn - PURLIN_H / 2
-            pur.append(F.bar(L(s, r0 + 0.05, z), L(s, r1 - 0.05, z), 0.05, PURLIN_H, 'timber'))
+            pur.append(F.bar(L(s, r0 + 0.05, z), L(s, r1 - 0.05, z), PURLIN_B, PURLIN_H, 'timber'))
         add('IfcMember', 'PU-%s-%s' % (key, side), 'PU', 'ROOF', 'S-RoofTimber', pur,
-            Section='50x100 timber purlin @0.80', Count=len(pur))
+            Section=mmx('purlin') + ' timber purlin @0.80', Count=len(pur))
         # rafters
         raf = []
         n = max(2, int(round((r1 - r0 - 0.2) / step)) + 1)
@@ -242,19 +250,46 @@ def gable_roof(F, key, ridge, s0, s1, r0, r1, ze, pitch, gap=0.0, step=1.0, desc
             off = PURLIN_H + RAFTER_H / 2
             p1 = L(se - sg * 0.0, r, ze - off / cs)
             p2 = L(st, r, zr - off / cs)
-            raf.append(F.bar(p1, p2, 0.05, RAFTER_H, 'timber'))
+            raf.append(F.bar(p1, p2, RAFTER_B, RAFTER_H, 'timber'))
         add('IfcMember', 'RA-%s-%s' % (key, side), 'RA', 'ROOF', 'S-RoofTimber', raf,
-            Section='50x150 reclaimed timber rafter @%.2f' % ((r1 - r0 - 0.2) / (n - 1)), Count=len(raf))
-    zb = zr - R.drop - 0.10
+            Section=mmx('rafter') + ' reclaimed timber rafter @%.2f' % ((r1 - r0 - 0.2) / (n - 1)), Count=len(raf))
+    zb = zr - R.drop - RIDGE_H / 2
     if gap <= 0:
-        add('IfcBeam', 'RB-%s' % key, 'RB', 'ROOF', 'S-RoofTimber', F.bar(L(sm, r0, zb), L(sm, r1, zb), 0.10, 0.20, 'timber_dark'),
-            Section='100x200 ridge beam')
+        add('IfcBeam', 'RB-%s' % key, 'RB', 'ROOF', 'S-RoofTimber', F.bar(L(sm, r0, zb), L(sm, r1, zb), RIDGE_B, RIDGE_H, 'timber_dark'),
+            Section=mmx('ridge') + ' ridge beam')
     else:
         add('IfcBeam', 'RB-%s' % key, 'RB', 'ROOF', 'S-RoofTimber',
-            [F.bar(L(sm - gap, r0, zb), L(sm - gap, r1, zb), 0.10, 0.20, 'timber_dark'),
-             F.bar(L(sm + gap, r0, zb), L(sm + gap, r1, zb), 0.10, 0.20, 'timber_dark')],
-            Section='2 x 100x200 head beams at the clerestory')
+            [F.bar(L(sm - gap, r0, zb), L(sm - gap, r1, zb), RIDGE_B, RIDGE_H, 'timber_dark'),
+             F.bar(L(sm + gap, r0, zb), L(sm + gap, r1, zb), RIDGE_B, RIDGE_H, 'timber_dark')],
+            Section='2 x %s head beams at the clerestory' % mmx('ridge'))
+    R.sm, R.zb, R.ridge, R.F, R.gap = sm, zb, ridge, F, gap
     return R
+
+
+def king_truss(name, R, r, s_a, s_b, z_tie, kp_top=None):
+    """tie (ขื่อ) between wall plates s_a..s_b at ridge-coordinate r, king post (ดั้ง) to the ridge beam,
+    two struts (ตะเกียบ) from the king post foot to the rafters at mid-slope"""
+    F, sm = R.F, R.sm
+    L = (lambda s, rr, z: (s, rr, z)) if R.ridge == 'b' else (lambda s, rr, z: (rr, s, z))
+    tb, th = TS['tie']; kb, kh = TS['kingpost']; sb, sh = TS['strut']
+    zt = z_tie + th / 2
+    top = kp_top if kp_top is not None else R.zb - RIDGE_H / 2
+    parts = [F.bar(L(s_a - 0.05, r, zt), L(s_b + 0.05, r, zt), tb, th, 'timber_dark'),
+             F.bar(L(sm, r, z_tie + th), L(sm, r, top), kb, kh, 'timber_dark')]
+    for s_end in (s_a, s_b):
+        sx = (sm + s_end) / 2
+        parts.append(F.bar(L(sm, r, z_tie + th + 0.10), L(sx, r, under(R, sx) - 0.02), sb, sh, 'timber'))
+    add('IfcMember', name, 'TR', 'ROOF', 'S-RoofTimber', parts,
+        Section='tie %s, king post %s, struts %s' % (mmx('tie'), mmx('kingpost'), mmx('strut')),
+        Span_m=round(s_b - s_a, 2), Description='King-post truss (ขื่อ-ดั้ง-ตะเกียบ) carrying the ridge beam')
+
+
+def knee_braces(name, F, pts):
+    """pts: (post (a, b), beam point (a, b, z), post z) - 45 deg knee braces (ค้ำยัน)"""
+    bb, bh = TS['brace']
+    parts = [F.bar((pa, pb, pz), (qa, qb, qz), bb, bh, 'timber') for (pa, pb), (qa, qb, qz), pz in pts]
+    add('IfcMember', name, 'KB', 'GF', 'S-Beam', parts, Section=mmx('brace') + ' knee brace, 2 x M12 bolts each end',
+        Count=len(parts), Description='Knee braces for lateral (wind) stability of open frames')
 
 
 def under(R, s):
@@ -437,6 +472,10 @@ add('IfcWall', 'A-W-S-UP', 'GB', 'GF', 'A-Wall', box(AX0, ABX, AYS - .02, AYS + 
 gable_infill(I, 'A-GB-W', RA, 'a', AX0, AYS, AYN, A_PLATE)
 gable_infill(I, 'A-GB-E', RA, 'a', AX1, ABYS, AYN, A_PLATE, mat='plaster')
 gable_infill(I, 'A-GB-P', RA, 'a', ABX, AYS, AYN, A_PLATE)
+for i, x in enumerate(A_POSTS_X):                      # king-post trusses on every post line (photo 23: exposed ties)
+    king_truss('A-TR-%d' % i, RA, x, AYS if x < ABX - 0.01 else ABYS, AYN, A_PLATE)
+knee_braces('A-KB-V', I, [((x, AYV), (x + d * 0.70, AYV, 2.85), 2.15) for x in (AX0, ABAX, 4.425, 6.875) for d in (-1, 1)
+                         if -0.2 <= x + d * 0.70 <= ABX - 0.1])
 
 deck(I, 'A-DK-VER', [(AX0 - 0.05, 3.65), (ABX, 3.65), (ABX, AYS - 0.05), (AX0 - 0.05, AYS - 0.05)], DECK, 'South veranda deck')
 deck(I, 'A-DK-W', [(-0.95, 5.60), (AX0 - 0.05, 5.60), (AX0 - 0.05, 9.40), (-0.95, 9.40)], DECK, 'West veranda deck')
@@ -511,6 +550,13 @@ gable_infill(I, 'C-GB-WN', RCW, 'b', CYN, CX0, CXM, C_PLATE)
 gable_infill(I, 'C-GB-EN', RCE, 'b', CYN, 24.95, CXB, C_PLATE)
 gable_infill(I, 'C-GB-ES', RCE, 'b', CYB2, 24.95, CXE, C_PLATE)
 gable_infill(I, 'C-GB-EM', RCE, 'b', CYM, CXE, CXB, C_PLATE)
+for y, z in ((0.45, 3.20 - TS['tie'][1]), (CYS, C_PLATE), (CYM, C_PLATE), (CYN, C_PLATE)):
+    king_truss('C-TR-W%d' % round(y * 10), RCW, y, CX0, CXM, z)
+for y in (CYB2, CYS, CYM, CYN):
+    king_truss('C-TR-E%d' % round(y * 10), RCE, y, CXM, CXE if y < CYM - 0.01 else CXB, C_PLATE)
+knee_braces('C-KB', I, [((CXK + 0.1, y), (CXK + 0.1, y + d * 0.60, 2.55), 1.95) for y in (3.46, CYM, CYN) for d in (-1, 1)
+                        if 3.40 <= y + d * 0.60 <= CYN + 0.05] +
+            [((x, 0.45), (x + d * 0.70, 0.45, 3.00), 2.30) for x, d in ((CX0 + 0.1, 1), (CXM - 0.1, -1))])
 
 deck(I, 'C-DK-WALK', [(17.30, 2.32), (CX0, 2.32), (CX0, 3.58), (17.30, 3.58)], DECK, 'Walkway deck pergola -> C (plan)')
 deck(I, 'C-DK-SIDE', [(CXK, 3.58), (CX0 - .05, 3.58), (CX0 - .05, CYN), (CXK, CYN)], DECK, 'Covered side walk, west of C')
@@ -558,11 +604,26 @@ add('IfcCovering', 'D-CEIL', 'CL', 'GF', 'A-Ceiling', F.box(0.10, 7.10, 0.15, 3.
 
 RDL = gable_roof(F, 'D', 'b', -0.80, DA + 0.80, -0.60, DB + 0.60, 2.60, 25, gap=1.0, desc='garage, lower slopes')
 RDU = gable_roof(F, 'DU', 'b', DA / 2 - 1.55, DA / 2 + 1.55, -0.60, DB + 0.60, 4.55, 25, desc='raised clerestory (monitor) roof')
+D_TIES = (0.10, 3.40, 6.90, DB - 0.10)
 mp = []
-for b in (-0.4, 2.0, 4.6, 7.2, DB + 0.4):
+for b in D_TIES:                                      # monitor posts stand on the tie beams and carry the head beams
     for a in (DA / 2 - 1.0, DA / 2 + 1.0):
-        mp.append(F.bar((a, b, under(RDL, a) + 0.05), (a, b, under(RDU, a) + RDU.drop - 0.30), 0.10, 0.10, 'timber_dark'))
-add('IfcMember', 'D-MONITOR-POSTS', 'MP', 'ROOF', 'S-RoofTimber', mp, Section='100x100 timber studs carrying the clerestory roof')
+        mp.append(F.bar((a, b, D_PLATE), (a, b, under(RDU, a) + RDU.drop - 0.30), TS['kingpost'][0], TS['kingpost'][1], 'timber_dark'))
+    mp.append(F.bar((DA / 2, b, D_PLATE), (DA / 2, b, RDU.zb - RIDGE_H / 2), TS['kingpost'][0], TS['kingpost'][1], 'timber_dark'))
+add('IfcMember', 'D-MONITOR-POSTS', 'MP', 'ROOF', 'S-RoofTimber', mp,
+    Section=mmx('kingpost') + ' posts on the tie beams: 2 per tie under the head beams + king post to the clerestory ridge')
+for i, b in enumerate(D_TIES[1:]):                    # centre posts under the tie beams (Rungkit07 shows one)
+    post(F, 'D-C-C%d' % (i + 1), DA / 2, b, 0.12, D_PLATE - 0.20, size=0.20, stump_top=0.0)
+kb = []
+for b in D_TIES:
+    for a, d in ((0.10, 1), (DA - 0.10, -1)):
+        kb.append(((a, b), (a + d * 0.75, b, D_PLATE - 0.20), D_PLATE - 0.95))
+        for e in (-1, 1):
+            if -0.1 <= b + e * 0.75 <= DB + 0.1:
+                kb.append(((a, b), (a, b + e * 0.75, D_PLATE - 0.25), D_PLATE - 1.00))
+    if b > 1:
+        kb += [((DA / 2, b), (DA / 2 + d * 0.75, b, D_PLATE - 0.20), D_PLATE - 0.95) for d in (-1, 1)]
+knee_braces('D-KB', F, kb)
 # gable slat screen at the south end (Featured image / Rungkit07) - full height under both roofs
 sl = []
 for k in range(int(DA / 0.14) + 1):
@@ -601,6 +662,8 @@ add('IfcBeam', 'PG-B-S', 'PB', 'GF', 'S-Beam', box(-0.30, 19.80, PY[0] - .06, PY
 pb = [box(x - .05, x + .05, 1.80, 9.75, 2.40, 2.60, 'timber_dark') for x in PX_ROW[-3:]]
 pb += [box(14.40, 19.80, y - .05, y + .05, 2.60, 2.80, 'timber_dark') for y in PY[1:]]
 add('IfcBeam', 'PG-B-G', 'PB', 'GF', 'S-Beam', pb, Section='100x200 timber, two levels (photo 12)')
+knee_braces('PG-KB', I, [((x, PY[0]), (x + d * 0.60, PY[0], 2.75), 2.15) for x in PX_ROW for d in (-1, 1) if -0.3 <= x + d * 0.6 <= 19.8] +
+            [((x, y), (x, y + d * 0.60, 2.40), 1.80) for x in PX_ROW[-3:] for y in PY for d in (-1, 1) if 1.8 <= y + d * 0.6 <= 9.75])
 deck(I, 'P-DK-DIAG', [(3.98, 3.62), (9.35, 3.62), (15.16, 0.56), (13.95, -1.68)], DECK, 'Diagonal deck A -> garage (plan, photo 17)')
 add('IfcSlab', 'GROUND', 'SITE', 'GF', 'Site', box(-5.0, 35.0, -17.0, 14.0, -0.05, 0.0, 'ground'), Description='Site (extent ASSUMED)')
 for nm, (x, y), h, r in (('TREE-1', (5.49, 1.63), 5.2, 2.2), ('TREE-2', (19.10, 0.20), 5.6, 2.6)):

@@ -467,6 +467,213 @@ MAIN = dict(total_connected_kVA=round(sum(c['va'] for c in CIRCUITS) / 1000, 2),
 worst_total_vd = max(MAIN['vd'] + next((f['vd'] for f in FEEDERS if f['to'] == c['cu']), 0) + c['vd'] for c in CIRCUITS)
 MAIN['worst_total_vd'] = round(worst_total_vd, 2)
 
+# ================================================================== PART 3  TIMBER SUPERSTRUCTURE (allowable stress design)
+# Reclaimed hardwood (teng / rang class, ไม้เนื้อแข็ง). Allowable stresses for new hardwood x 0.80 for reclaimed stock
+# (nail holes, checks, unknown grade). Values to be confirmed against EIT 1003 and tests on the actual timber.
+TIMB = dict(Fb=120, Ft=120, Fc=85, Fcp=30, Fv=12, E=120000)          # ksc, new hardwood
+KSC = 0.0981                                                       # ksc -> MPa
+RED = 0.80
+CD = {'D+Lr': 1.25, 'D+W': 1.33}
+Fb, Ft, Fc, Fv = (TIMB[k] * KSC * RED for k in ('Fb', 'Ft', 'Fc', 'Fv'))
+E_t = TIMB['E'] * KSC * 0.9
+ASSUME_T = dict(stresses_ksc=TIMB, reclaimed_factor=RED, load_duration=CD, deflection='L/240 (D+Lr)')
+wind_up = {r['key']: -r['wind'] for r in ROOFS}                   # kPa upward (positive)
+roof_dl = {r['key']: r['dl'] for r in ROOFS}                      # kPa on plan incl. members
+
+
+def flex(b, h, L, wD, wL, wU=0.0, P=0.0, a=None, self_w=True):  # noqa: C901
+    """simple span L (m), uniform wD/wL (kN/m), uplift wU (kN/m up), point P (kN, D+Lr) at a from left (default mid).
+    Returns stress ratios for D+Lr and 0.6D-W, and deflection ratio."""
+    Ar = b * h; S = b * h * h / 6; I = b * h ** 3 / 12
+    sw = Ar * ASSUME['timber_kN_m3'] if self_w else 0.0
+    wD = wD + sw
+    a = L / 2 if a is None else a
+    bb = L - a
+    M = (wD + wL) * L * L / 8 + P * a * bb / L
+    V = (wD + wL) * L / 2 + P * max(a, bb) / L
+    fb = M / S / 1000                                    # MPa (kN.m / m3 -> kPa /1000)
+    fv = 1.5 * V / Ar / 1000
+    Mu = max(0.0, wU - 0.6 * wD) * L * L / 8
+    fbu = Mu / S / 1000
+    w = wD + wL
+    dfl = 5 * w * L ** 4 / (384 * E_t * 1000 * I) + (P * a * bb * (L * L - a * a - bb * bb) ** 0.5 / (9 * 3 ** 0.5 * L * E_t * 1000 * I) if P else 0.0)
+    r = dict(fb=round(fb, 2), Fb=round(Fb * CD['D+Lr'], 2), fv=round(fv, 3), Fv=round(Fv * CD['D+Lr'], 3), fbu=round(fbu, 2),
+             Fbu=round(Fb * CD['D+W'], 2), defl_mm=round(dfl * 1000, 1), lim_mm=round(L / 240 * 1000, 1), M=round(M, 2), V=round(V, 2))
+    r['ratio'] = round(max(fb / (Fb * CD['D+Lr']), fv / (Fv * CD['D+Lr']), fbu / (Fb * CD['D+W']), dfl / (L / 240)), 3)
+    r['ok'] = r['ratio'] <= 1.0
+    return r
+
+
+def column(b, h, L, P, M=0.0, cd=CD['D+Lr']):
+    """EIT timber column formula (rectangular): short l/d<=11, intermediate to K, long to 50; combined axial + bending"""
+    d = min(b, h)
+    ld = L / d
+    K = 0.671 * math.sqrt(E_t / Fc)
+    if ld <= 11:
+        Fcp = Fc
+    elif ld <= K:
+        Fcp = Fc * (1 - (ld / K) ** 4 / 3)
+    else:
+        Fcp = 0.3 * E_t / ld ** 2
+    fc = P / (b * h) / 1000
+    fb = M / (b * h * h / 6) / 1000
+    ratio = fc / (Fcp * cd) + fb / (Fb * cd)
+    return dict(ld=round(ld, 1), K=round(K, 1), Fcp=round(Fcp * cd, 2), fc=round(fc, 3), fb=round(fb, 2), ratio=round(ratio, 3),
+                ok=ratio <= 1.0 and ld <= 50)
+
+
+cosd = lambda deg: math.cos(math.radians(deg))
+ROOF_GEOM = {   # key: pitch, worst rafter slope span (supports from the model), ridge spans (truss lines), ridge tributary (plan m)
+    'A': dict(pitch=30, raf_plan=mm.AYN - 7.0, ridge_span=max(b - a for a, b in zip(mm.A_POSTS_X, mm.A_POSTS_X[1:])),
+              ridge_trib=((7.0 - mm.AYS) + (mm.AYN - 7.0)) / 2, ceiling=0.10),
+    'CW': dict(pitch=45, raf_plan=mm.CXM - mm.RCW.sm, ridge_span=mm.CYM - mm.CYS, ridge_trib=((mm.RCW.sm - mm.CX0) + (mm.CXM - mm.RCW.sm)) / 2, ceiling=0.0),
+    'CE': dict(pitch=30, raf_plan=mm.RCE.sm - mm.CXM, ridge_span=mm.CYM - mm.CYS, ridge_trib=((mm.RCE.sm - mm.CXM) + (mm.CXB - mm.RCE.sm)) / 2, ceiling=0.0),
+    'D': dict(pitch=25, raf_plan=(mm.DA / 2 - 1.0) - 0.10, ridge_span=max(b - a for a, b in zip(mm.D_TIES, mm.D_TIES[1:])),
+              ridge_trib=((mm.DA / 2 - 1.0) - 0.10) / 2 + 1.0, ceiling=0.0),
+    'DU': dict(pitch=25, raf_plan=1.0, ridge_span=max(b - a for a, b in zip(mm.D_TIES, mm.D_TIES[1:])), ridge_trib=1.0, ceiling=0.0),
+}
+SIZES = {
+    'purlin': [(0.05, 0.075), (0.05, 0.10), (0.05, 0.125), (0.05, 0.15)],
+    'rafter': [(0.05, 0.125), (0.05, 0.15), (0.05, 0.175), (0.05, 0.20), (0.075, 0.20)],
+    'ridge': [(0.10, 0.15), (0.10, 0.20), (0.10, 0.25), (0.15, 0.25), (0.15, 0.30)],
+    'tie': [(0.10, 0.15), (0.10, 0.20), (0.10, 0.25), (0.15, 0.25)],          # pair of 50 mm boards bolted to the post
+    'kingpost': [(0.10, 0.10), (0.10, 0.15), (0.15, 0.15)],
+    'strut': [(0.05, 0.10), (0.05, 0.15)],
+    'brace': [(0.05, 0.10), (0.10, 0.10), (0.10, 0.15)],
+}
+TCHK = defaultdict(list)                  # group -> list of (case, size, result)
+PURLIN_SP = 0.80; RAFTER_SP = 1.0
+
+
+def pick(group, fn):
+    for sz in SIZES[group]:
+        res = [(case, fn(sz, case)) for case in fn.cases]
+        if all(r['ok'] for _, r in res):
+            return sz, res
+    return SIZES[group][-1], res
+
+
+def f_purlin(sz, k):
+    g = ROOF_GEOM[k]; c = cosd(g['pitch'])
+    wD = A_['roof_sheet_kPa'] * PURLIN_SP; wL = A_['roof_LL_kPa'] * PURLIN_SP * c
+    return flex(sz[0], sz[1], RAFTER_SP, wD, wL, wind_up[k] * PURLIN_SP)
+
+
+def f_rafter(sz, k):
+    g = ROOF_GEOM[k]; c = cosd(g['pitch'])
+    L = g['raf_plan'] / c
+    pur = SEL['purlin']
+    wD = (A_['roof_sheet_kPa'] + g['ceiling']) * RAFTER_SP + pur[0] * pur[1] * A_['timber_kN_m3'] / PURLIN_SP * RAFTER_SP
+    return flex(sz[0], sz[1], L, wD, A_['roof_LL_kPa'] * RAFTER_SP * c * c, wind_up[k] * RAFTER_SP)
+
+
+def f_ridge(sz, k):
+    g = ROOF_GEOM[k]
+    t = g['ridge_trib']
+    return flex(sz[0], sz[1], g['ridge_span'], roof_dl[k] * t, A_['roof_LL_kPa'] * t, wind_up[k] * t)
+
+
+def ridge_reaction(k):
+    g = ROOF_GEOM[k]
+    return (roof_dl[k] + A_['roof_LL_kPa']) * g['ridge_trib'] * g['ridge_span'] * 1.10    # continuous over the king post
+
+
+def f_tie(sz, k):
+    if k == 'D':          # tie from wall post to centre post, monitor post load at 1.0 m from the centre post
+        L = mm.DA / 2 - 0.10
+        P = ridge_reaction('D') + ridge_reaction('DU') / 2
+        return flex(sz[0], sz[1], L, 0.0, 0.0, 0.0, P=P, a=L - 1.0)
+    spans = {'A': mm.AYN - mm.ABYS, 'CW': mm.CXM - mm.CX0, 'CE': mm.CXB - mm.CXM}
+    L = spans[k]
+    return flex(sz[0], sz[1], L, 0.0, 0.0, 0.0, P=ridge_reaction(k) * 1.25, a=L / 2)      # x1.25 strut loads
+
+
+def f_kingpost(sz, k):
+    hgt = {'A': mm.RA.zb - mm.A_PLATE, 'CW': mm.RCW.zb - mm.C_PLATE, 'CE': mm.RCE.zb - mm.C_PLATE, 'DU': mm.RDU.zb - mm.D_PLATE}[k]
+    return column(sz[0], sz[1], hgt, ridge_reaction(k))
+
+
+def f_strut(sz, k):
+    g = ROOF_GEOM[k]
+    L = math.hypot(g['raf_plan'] / 2, g['raf_plan'] / 2 * math.tan(math.radians(g['pitch'])) + 0.3)
+    P = (roof_dl[k] + A_['roof_LL_kPa']) * g['raf_plan'] / 2 * ROOF_GEOM[k]['ridge_span'] * 0.5
+    return column(sz[0], sz[1], L, P)
+
+
+SEL = {}
+for grp, fn, cases in (('purlin', f_purlin, ['A', 'CW', 'CE', 'D', 'DU']), ('rafter', f_rafter, ['A', 'CW', 'CE', 'D', 'DU']),
+                       ('ridge', f_ridge, ['A', 'CW', 'CE', 'D', 'DU']), ('tie', f_tie, ['A', 'CW', 'CE', 'D']),
+                       ('kingpost', f_kingpost, ['A', 'CW', 'CE', 'DU']), ('strut', f_strut, ['A', 'CW', 'CE'])):
+    fn.cases = cases
+    SEL[grp], TCHK[grp] = pick(grp, fn)
+
+# ---------------- plates / beams on posts (sizes as modelled: check only)
+PLATES = []
+for nm, line_posts, trib, k, sz in (
+        ('A-B-N (north plate)', mm.A_POSTS_X, (mm.AYN - 7.0) / 2 + 0.90, 'A', (0.10, 0.20)),
+        ('A-B-V (veranda beam)', [0.0, mm.ABAX, 4.425, 6.875], 0.60 + (mm.AYS - mm.AYV) / 2, 'A', (0.12, 0.20)),
+        ('C-B-X (C-W | C-E wall)', [mm.CYB2, mm.CYS, mm.CYM, mm.CYN], (mm.CXM - mm.RCW.sm) / 2 + (mm.RCE.sm - mm.CXM) / 2, 'CE', (0.10, 0.20)),
+        ('C-B-W (C west wall)', [mm.CYS, mm.CYM, mm.CYN], (mm.RCW.sm - mm.CX0) / 2 + (mm.CX0 - mm.CXK - 0.1) / 2, 'CW', (0.10, 0.20)),
+        ('D-B-W/E (garage plates)', list(mm.D_TIES), ((mm.DA / 2 - 1.0) - 0.10) / 2 + 0.90, 'D', (0.12, 0.25))):
+    span = max(b - a for a, b in zip(sorted(line_posts), sorted(line_posts)[1:]))
+    r = flex(sz[0], sz[1], span, roof_dl[k] * trib, A_['roof_LL_kPa'] * trib, wind_up[k] * trib)
+    PLATES.append(dict(name=nm, size='%dx%d' % (sz[0] * 1000, sz[1] * 1000), span=round(span, 2), trib=round(trib, 2), **r))
+
+# ---------------- posts: axial from the foundation loads, + wind bending for knee-braced open frames (garage, veranda)
+q_lat = q_wind * 1.3                                         # kPa, net drag on open frames
+POSTCHK = []
+for qq in POSTS:
+    e = byname[qq['name']]
+    p = e[5][0]
+    size = (p[2] - p[1]) if p[0] == 'box' else math.dist(p[1][0][:2], p[1][1][:2])
+    L = qq['z1'] - qq['z0']
+    M = 0.0
+    size = round(size, 2)
+    if qq['bld'] == 'D' and not qq['name'].startswith('D-C-M'):   # open frames; D-C-M posts sit in the store-room walls
+        # frame spacing 3.5 m, roof + structure height ~4.9 m, 3 posts per frame
+        H = 3.5 * 4.9 * q_lat / 3
+        M = H * (L - 0.95)
+    elif qq['name'].startswith('A-C-V'):
+        H = 2.4 * 3.0 * q_lat / 2
+        M = H * (L - 0.70)
+    c1 = column(size, size, L, 1.0 * qq['Ps'], 0.0)
+    c2 = column(size, size, L, qq['D'], M, CD['D+W'])
+    POSTCHK.append(dict(post=qq['name'], size='%dx%d' % (size * 1000, size * 1000), L=round(L, 2), P=round(qq['Ps'], 1), M_wind=round(M, 2),
+                        ratio=max(c1['ratio'], c2['ratio']), ld=c1['ld'], ok=c1['ok'] and c2['ok']))
+
+# ---------------- knee braces (garage frames govern) and wall racking (A, C)
+H_post = 3.5 * 4.9 * q_lat / 3
+d_perp = 0.75 * math.sin(math.radians(45))
+F_brace = H_post * (mm.D_PLATE - 0.20 - 0.95 - 0.12) / d_perp
+bsz = None
+for sz in SIZES['brace']:
+    c = column(sz[0], sz[1], 0.75 * math.sqrt(2), F_brace, 0.0, CD['D+W'])
+    if c['ok']:
+        bsz = sz
+        break
+BOLT2 = 2 * BOLT_ALLOW * CD['D+W']
+BRACE = dict(H_post=round(H_post, 2), F=round(F_brace, 2), size='%dx%d' % (bsz[0] * 1000, bsz[1] * 1000), col=c,
+             bolts='2 x M12 each end, capacity %.1f kN' % BOLT2, ok=c['ok'] and F_brace <= BOLT2)
+SEL['brace'] = bsz
+RACK = []
+for nm, length, height, lines in (('A (wind on the long side)', 14.0, 3.10 + 2.2, 4), ('A (wind on the gable)', 7.5, 3.10 + 1.1, 2),
+                                  ('C (wind on the long side)', 10.0, 2.95 + 2.3, 4), ('C (wind on the gable)', 10.0, 2.95 + 1.5, 4)):
+    Wt = length * height * q_wind * 1.3
+    per = Wt / lines
+    f = per / 2 / math.cos(math.radians(45))
+    RACK.append(dict(case=nm, W=round(Wt, 1), wall_lines=lines, per_line=round(per, 2), brace_force=round(f, 2),
+                     detail='2 let-in diagonal braces 50x100 per wall line, 2 x M12 each end', ok=f <= BOLT2))
+# rafter uplift connection
+RAF_UP = max((wind_up[k] - 0.6 * roof_dl[k]) * RAFTER_SP * ROOF_GEOM[k]['raf_plan'] / 2 + (wind_up[k] - 0.6 * roof_dl[k]) * RAFTER_SP * 0.9
+              for k in ROOF_GEOM)
+TIMBER = dict(assumptions=ASSUME_T, sections={k: [round(v[0], 3), round(v[1], 3)] for k, v in SEL.items()},
+              checks={g: [dict(case=c, **r) for c, r in rows] for g, rows in TCHK.items()}, plates=PLATES, posts=POSTCHK,
+              brace=BRACE, racking=RACK, rafter_uplift_kN=round(RAF_UP, 2),
+              rafter_tie='galvanised hurricane strap 1.5 mm + 4 screws each side at every rafter-plate joint (capacity ~3 kN)',
+              ok=all(r['ok'] for rows in TCHK.values() for _, r in rows) and all(p['ok'] for p in PLATES) and
+              all(p['ok'] for p in POSTCHK) and BRACE['ok'] and all(r['ok'] for r in RACK) and RAF_UP <= 3.0)
+
+
 # ================================================================== results
 FOOT_TYPES = {}
 for q in POSTS:
@@ -483,8 +690,9 @@ RES = dict(
               for q in POSTS},
     footing_types=FOOT_TYPES, anchor=ANCHOR, grade_beams=GB, deck_pier=PIER,
     electrical=dict(circuits=CIRCUITS, feeders=FEEDERS, main=MAIN),
+    timber=TIMBER,
 )
-all_ok = all(q['ftg']['ok'] and q['stump']['ok'] and q['uplift']['ok'] for q in POSTS) and ANCHOR['ok'] and PIER['ok'] and all(g['ok'] for g in GB)
+all_ok = all(q['ftg']['ok'] and q['stump']['ok'] and q['uplift']['ok'] for q in POSTS) and ANCHOR['ok'] and PIER['ok'] and all(g['ok'] for g in GB) and TIMBER['ok']
 RES['all_structural_checks_ok'] = all_ok
 os.makedirs(OUT, exist_ok=True)
 with open(os.path.join(OUT, 'design_results.json'), 'w', encoding='utf-8') as f:
@@ -504,4 +712,10 @@ if __name__ == '__main__':
         print('feeder:', f)
     for c in CIRCUITS:
         print('  %-7s %-5s %-15s n=%2d %5dVA I=%5.1f %s CB%dA %s L=%.0f vd=%.2f%%' % (c['id'], c['cu'], c['kind'], c['n'], c['demand'], c['I'], c['phase'], c['cb'], c['cable'], c['L'], c['vd']))
+    print('timber sections:', TIMBER['sections'])
+    for g, rows in TIMBER['checks'].items():
+        print('  %-9s' % g, ' '.join('%s:%.2f%s' % (r['case'], r['ratio'], '' if r['ok'] else '!') for r in rows))
+    print('  plates', [(p['name'], p['span'], p['ratio']) for p in TIMBER['plates']])
+    print('  posts worst', sorted([(p['ratio'], p['post'], p['size'], p['M_wind']) for p in TIMBER['posts']])[-4:])
+    print('  brace', TIMBER['brace']['F'], TIMBER['brace']['size'], TIMBER['brace']['ok'], ' racking', [(r['case'], r['brace_force']) for r in TIMBER['racking']], ' rafter uplift', TIMBER['rafter_uplift_kN'])
     print('ALL STRUCTURAL CHECKS OK' if all_ok else 'SOME CHECKS FAIL')
