@@ -136,6 +136,38 @@ def act_of(tmpl, b):
     raise KeyError(code)
 
 
+# ------------------------------------------------------------------ preliminary design (design_calc.py), if present
+_DJ = os.path.join(HERE, 'design', 'design_results.json')
+DESIGN = json.load(open(_DJ, encoding='utf-8')) if os.path.exists(_DJ) else {}
+
+
+def _feeder(which):
+    el = DESIGN.get('electrical')
+    if not el:
+        return None
+    if which == 'main':
+        m = el['main']
+        return dict(cable=m['cable'], conduit='', mm2=m['mm2'], cores=4)
+    f = {x['to']: x for x in el['feeders']}['CU-' + which]
+    return dict(cable=f['cable'], conduit=f['conduit'], mm2=f['mm2'], cores=4 if f['three_phase'] else 2, ground=f['ground'])
+
+
+def _cable(which, default):
+    f = _feeder(which)
+    if not f:
+        return default
+    txt = f['cable'].replace('mm2', 'ตร.มม.').replace(' in ', ' ใน ').replace(' mm', ' มม.')
+    return txt + (' ใน ' + f['conduit'].replace(' mm', ' มม.') if f['conduit'] else '')
+
+
+def _cable_rate(which, default):
+    """NYY cable + HDPE conduit, material per metre (ESTIMATE: ~4.6 baht per core-mm2 per m + 85 baht conduit/fittings)"""
+    f = _feeder(which)
+    if not f:
+        return default
+    return round(4.6 * (f['cores'] * f['mm2'] + f.get('ground', 0)) + 85, -1)
+
+
 # ------------------------------------------------------------------ BOQ items: key -> (cat, group, description, unit, mat, lab, waste%, activity template)
 S, A, P, EL = 'S', 'A', 'P', 'E'
 CATS = [(S, 'หมวดที่ 1 งานโครงสร้าง'), (A, 'หมวดที่ 2 งานสถาปัตยกรรม'), (P, 'หมวดที่ 3 งานระบบสุขาภิบาลและประปา'), (EL, 'หมวดที่ 4 งานระบบไฟฟ้าและแสงสว่าง')]
@@ -151,7 +183,7 @@ ITEMS = {
     'c_gb': (S, '1.2 งานดินและฐานราก', "คอนกรีตคานคอดิน fc' 240 ksc", 'ลบ.ม.', 2350, 300, 3, 'F-{b}'),
     'c_pier': (S, '1.2 งานดินและฐานราก', 'คอนกรีตตอม่อชานไม้ 0.20x0.20 + ฐานเล็ก', 'ลบ.ม.', 2350, 400, 3, 'F-{b}'),
     'fw': (S, '1.2 งานดินและฐานราก', 'ไม้แบบ ฐานราก ตอม่อ คานคอดิน', 'ตร.ม.', 160, 200, 0, 'F-{b}'),
-    'rebar': (S, '1.2 งานดินและฐานราก', 'เหล็กเสริม DB12 / RB6 (ประมาณจากอัตราส่วน กก./ลบ.ม.)', 'กก.', 25, 5, 5, 'F-{b}'),
+    'rebar': (S, '1.2 งานดินและฐานราก', 'เหล็กเสริม SD40 DB12 / SR24 RB6, RB9 (ฐานราก ตอม่อ คานคอดิน ตามรายการคำนวณ design_calc.py)', 'กก.', 25, 5, 5, 'F-{b}'),
     'boulder': (S, '1.2 งานดินและฐานราก', 'ฐานหินธรรมชาติใต้เสาซุ้ม + เดือยเหล็ก/แผ่นยึด', 'ก้อน', 1500, 500, 0, 'F-{b}'),
     'backfill': (S, '1.2 งานดินและฐานราก', 'ถมดินคืนบดอัด', 'ลบ.ม.', 0, 90, 0, 'F-{b}'),
     'sand_fill': (S, '1.3 งานพื้น', 'ทรายถมบดอัดใต้พื้น หนา 0.10', 'ลบ.ม.', 500, 100, 5, 'SL-{b}'),
@@ -224,18 +256,24 @@ ITEMS = {
     'p_soak': (P, '3.3 ระบบระบายน้ำ', 'บ่อซึม dia 1.20 ลึก 1.80 (ท่อซีเมนต์ + หินกรวด)', 'บ่อ', 4500, 2500, 0, 'UT'),
     'p_test': (P, '3.4 ทดสอบ', 'ทดสอบแรงดันท่อประปา + ทดสอบการไหลท่อระบาย', 'งาน', 0, 3000, 0, 'TC'),
     # ---- electrical
-    'e_meter': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'ขอใช้ไฟ PEA มิเตอร์ 15(45)A 3 เฟส + เสาคอนกรีต 6 ม. (ค่าธรรมเนียมประมาณ)', 'งาน', 22000, 6000, 0, 'UT'),
-    'e_mdb': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'ตู้ MDB load center 3 เฟส เมน 3P 63A + RCBO 12 ช่อง', 'ชุด', 18000, 3000, 0, 'WL-{b}'),
-    'e_cu': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'ตู้ consumer unit 1 เฟส เมน 63A + RCBO 10-12 ช่อง', 'ชุด', 6500, 1500, 0, 'MR-{b}'),
-    'e_fd_main': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'สายเมน NYY 4x25 ตร.มม. ใน HDPE 50 มม. ฝังดิน 0.65 ม. รวมขุด-กลบ', 'ม.', 520, 120, 5, 'UG-{b}'),
-    'e_fd_sub25': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'สายป้อน NYY 2x25 + G 16 ตร.มม. ใน HDPE 40 มม. ฝังดิน', 'ม.', 330, 100, 5, 'UG-{b}'),
-    'e_fd_sub16': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'สายป้อน NYY 2x16 + G 10 ตร.มม. ใน HDPE 40 มม. ฝังดิน', 'ม.', 250, 90, 5, 'UG-{b}'),
+    'e_meter': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'ขอใช้ไฟ PEA มิเตอร์ %s + เสาคอนกรีต 6 ม. (ค่าธรรมเนียมประมาณ)' % (
+        DESIGN['electrical']['main']['meter'].replace('3-phase 4-wire', '3 เฟส 4 สาย') if DESIGN.get('electrical') else '15(45)A 3 เฟส'), 'งาน', 22000, 6000, 0, 'UT'),
+    'e_mdb': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'ตู้ MDB load center 3 เฟส เมน %s 12 ช่อง' % (DESIGN['electrical']['main']['main_cb'] if DESIGN.get('electrical') else '3P 63A + RCBO'),
+              'ชุด', 18000, 3000, 0, 'WL-{b}'),
+    'e_cu': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'ตู้ consumer unit 1 เฟส เมน + RCBO/RCD 30 mA 10 ช่อง', 'ชุด', 6500, 1500, 0, 'MR-{b}'),
+    'e_cu3': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'ตู้ consumer unit 3 เฟส 4 สาย เมน 3P + RCBO/RCD 30 mA 12 ช่อง', 'ชุด', 11000, 2000, 0, 'MR-{b}'),
+    'e_fd_main': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'สายเมน %s ฝังดิน 0.65 ม. รวมขุด-กลบ' % _cable('main', 'NYY 4x25 ตร.มม. ใน HDPE 50 มม.'), 'ม.',
+                  _cable_rate('main', 520), 120, 5, 'UG-{b}'),
+    'e_fd_a': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'สายป้อน %s ฝังดิน MDB -> CU-A' % _cable('A', 'NYY 2x16 + G 10 ตร.มม. ใน HDPE 40 มม.'), 'ม.',
+               _cable_rate('A', 250), 90, 5, 'UG-{b}'),
+    'e_fd_c': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'สายป้อน %s ฝังดิน MDB -> CU-C' % _cable('C', 'NYY 2x25 + G 16 ตร.มม. ใน HDPE 40 มม.'), 'ม.',
+               _cable_rate('C', 330), 100, 5, 'UG-{b}'),
     'e_fd_site': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'สาย NYY 3x2.5 ตร.มม. ใน HDPE 25 มม. วงจรไฟสนาม', 'ม.', 95, 60, 5, 'UG-{b}'),
     'e_fd_pump': (EL, '4.1 ระบบไฟฟ้ากำลัง', 'สาย NYY 3x2.5 ตร.มม. ใน HDPE 25 มม. วงจรปั๊มน้ำ', 'ม.', 95, 60, 5, 'UG-{b}'),
     'e_sock': (EL, '4.2 เต้ารับและสวิตช์', 'จุดเต้ารับคู่มีกราวด์ 16A (สาย THW 2.5 ในท่อ)', 'จุด', 450, 300, 0, 'MR-{b}'),
     'e_sock_ip': (EL, '4.2 เต้ารับและสวิตช์', 'จุดเต้ารับกันน้ำ IP55 ภายนอก', 'จุด', 700, 350, 0, 'MR-{b}'),
     'e_switch': (EL, '4.2 เต้ารับและสวิตช์', 'จุดสวิตช์ไฟ 1-2 ทาง', 'จุด', 250, 200, 0, 'MR-{b}'),
-    'e_lpt': (EL, '4.3 ระบบแสงสว่าง', 'จุดเดินสายดวงโคม (THW 1.5 ในท่อ เฉลี่ย 8 ม./จุด)', 'จุด', 350, 250, 0, 'MR-{b}'),
+    'e_lpt': (EL, '4.3 ระบบแสงสว่าง', 'จุดเดินสายดวงโคม (THW 2.5 + G ในท่อ เฉลี่ย 8 ม./จุด, ขนาดต่ำสุดตาม วสท.)', 'จุด', 380, 250, 0, 'MR-{b}'),
     'l_pend': (EL, '4.3 ระบบแสงสว่าง', 'โคมไฟห้อย โป๊ะกระดาษ LED 12 W', 'ชุด', 1800, 250, 0, 'FX-{b}'),
     'l_down': (EL, '4.3 ระบบแสงสว่าง', 'โคมดาวน์ไลท์ LED 9 W 3000K', 'ชุด', 450, 150, 0, 'FX-{b}'),
     'l_wall': (EL, '4.3 ระบบแสงสว่าง', 'โคมติดผนัง/เสา LED 7 W IP54', 'ชุด', 900, 200, 0, 'FX-{b}'),
@@ -285,17 +323,22 @@ for e in E:
     v = sum(vol(p) for p in parts)
     # ---------------- structure
     if ifc == 'IfcFooting' and 'concrete' in m:
-        put('c_ft', b, v, e, 'model volume'); put('exc', b, 1.2 * 1.2 * 1.30, e, '1.2x1.2x1.30 pit')
-        put('lean', b, 1.0 * 1.0 * 0.10, e, '1.0x1.0 sand 0.05 + lean 0.05'); put('fw', b, 3.2 * 0.25, e, 'perimeter x 0.25')
-        put('rebar', b, v * 60, e, '60 kg/m3'); put('backfill', b, 1.2 * 1.2 * 1.30 - v - 0.04 * 0.95, e, 'pit - concrete')
+        p0 = parts[0]
+        Bf = (p0[2] - p0[1]) if p0[0] == 'box' else math.dist(p0[1][0], p0[1][1])
+        hf = (p0[6] - p0[5]) if p0[0] == 'box' else p0[3]
+        pit = (Bf + 0.4) ** 2 * (0.95 + hf + 0.05)
+        put('c_ft', b, v, e, 'model volume'); put('exc', b, pit, e, '(B+0.40)^2 x depth')
+        put('lean', b, (Bf + 0.2) ** 2 * 0.10, e, '(B+0.20)^2 sand 0.05 + lean 0.05'); put('fw', b, 4 * Bf * hf, e, 'perimeter x h')
+        put('rebar', b, at.get('Rebar_kg', v * 60), e, 'designed: ' + at['Rebar'] if 'Rebar' in at else '60 kg/m3')
+        put('backfill', b, pit - v - 0.04 * 0.95 - (Bf + 0.2) ** 2 * 0.10, e, 'pit - concrete - stump - lean')
     elif ifc == 'IfcFooting':
         put('boulder', b, 1, e, 'count')
     elif ifc == 'IfcColumn' and mark == 'ST':
         h = parts[0][6] - parts[0][5] if parts[0][0] == 'box' else parts[0][3]
-        put('c_st', b, v, e, 'model volume'); put('fw', b, 4 * 0.2 * h, e, '4 x 0.20 x h'); put('rebar', b, v * 140, e, '140 kg/m3')
+        put('c_st', b, v, e, 'model volume'); put('fw', b, 4 * 0.2 * h, e, '4 x 0.20 x h'); put('rebar', b, at.get('Rebar_kg', v * 140), e, 'designed: ' + at['Rebar'] if 'Rebar' in at else '140 kg/m3')
     elif ifc == 'IfcBeam' and mark == 'GB1':
         L = sum(max(p[2] - p[1], p[4] - p[3]) for p in parts)
-        put('c_gb', b, v, e, 'model volume'); put('fw', b, 2 * 0.4 * L, e, '2 sides x 0.40 x L'); put('rebar', b, v * 110, e, '110 kg/m3')
+        put('c_gb', b, v, e, 'model volume'); put('fw', b, 2 * 0.4 * L, e, '2 sides x 0.40 x L'); put('rebar', b, at.get('Rebar_kg', v * 110), e, 'designed: ' + at['Rebar'] if 'Rebar' in at else '110 kg/m3')
         put('exc', b, 0.5 * 0.5 * L, e, '0.50x0.50 x L'); put('lean', b, 0.3 * 0.05 * L, e, '0.30 x 0.05 x L')
         put('backfill', b, 0.5 * 0.5 * L - 0.2 * 0.4 * L, e, 'trench - beam')
     elif name.endswith('-SUB'):
@@ -754,7 +797,8 @@ notes = [
     '1. ตำแหน่ง/ขนาดในผัง: วัดจากผังบริเวณที่มีสเกล 10 ม. (24.6 px/ม.) ความคลาดเคลื่อน ±0.2 ม. ; ความสูงและความชันหลังคาประมาณจากภาพถ่าย',
     '2. ขนาดประตู-หน้าต่างไม้เก่า: จากตารางในแบบ (D01-D20, W01-W12) ; ตำแหน่งติดตั้งประมาณจากผัง/ภาพ axonometric',
     '3. โครงสร้าง (ฐานราก 0.80x0.80 ตอม่อ 0.20 คานคอดิน 0.20x0.40 เสาไม้ 0.15-0.20) เป็นขนาดสมมติ ยังไม่ได้ออกแบบ - ต้องมีวิศวกรโยธาออกแบบและรับรอง',
-    '4. เหล็กเสริมคิดจากอัตราส่วน: ฐานราก 60, ตอม่อ 140, คานคอดิน 110, ตอม่อชาน 40 กก./ลบ.ม. ; เหล็กประกับไม้ 25 กก./ลบ.ม.ไม้',
+    '4. ฐานราก ตอม่อ คานคอดิน: ขนาดและเหล็กเสริมจากรายการคำนวณเบื้องต้น design/design_report.pdf (ACI 318-19, qa = 100 kPa สมมติ) ; ตอม่อชานยังคิด 40 กก./ลบ.ม. ; เหล็กประกับไม้ 25 กก./ลบ.ม.ไม้',
+    '4.1 สายป้อน ตู้ไฟ เบรกเกอร์: จากการคำนวณโหลดไฟฟ้าเบื้องต้น (design_calc.py) ; ราคาสาย NYY ประมาณจาก ตร.มม. รวมของทุกแกน',
     '5. งานระบบประปา-สุขาภิบาลและไฟฟ้า: แนวท่อ/สาย ตำแหน่งอุปกรณ์ ขนาดสาย เป็นแบบร่างเพื่อประมาณราคา - ต้องออกแบบโดยวิศวกรเครื่องกล/ไฟฟ้า (มาตรฐาน วสท.)',
     '6. แหล่งไฟฟ้า/น้ำ: สมมติเข้าจากถนนด้านทิศใต้ใกล้ทางรถ (PEA 3 เฟส 15(45)A, ประปาภูมิภาค 1/2") - ค่าธรรมเนียมจริงขึ้นกับการไฟฟ้า/การประปา',
     '7. ราคาต่อหน่วย: ราคาประมาณ ปี 2569 (ฐานเดียวกับแม่แบบ TYPE03 ใน House BIM Studio) ยังไม่รวม Factor F ; ไม้เก่าราคาผันผวนตามแหล่ง',

@@ -30,6 +30,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ENGINE_SRC = os.path.join(HERE, '..', 'Architecture', 'SoundStudio_House_BIM.rb')
 
 NOTE = 'Plan position from scaled plan; height/size ESTIMATED from photos - verify'
+# preliminary design written by design_calc.py (footing sizes, rebar, cables); absent -> assumed sizes
+_DJ = os.path.join(HERE, 'design', 'design_results.json')
+DESIGN = json.load(open(_DJ, encoding='utf-8')) if os.path.exists(_DJ) else {}
+DNOTE = 'Preliminary design (design_calc.py, ACI 318-19 / EIT) - qa ASSUMED, engineer to check and sign'
 FFL = 0.45                   # floor level of A and C (polished concrete on grade)
 DECK = 0.40                  # timber deck top
 E = []                       # [ifc, name, mark, level, tag, parts, attrs]
@@ -276,16 +280,47 @@ def gable_infill(F, name, R, ridge, c, w0, w1, zb, t=0.08, mat='timber_v'):
 
 
 # ------------------------------------------------------------------ structure helpers
+def gb_attrs(name):
+    rows = [g for g in DESIGN.get('grade_beams', []) if g['name'].split('/')[0] == name]
+    if not rows:
+        return dict(Note='ASSUMED')
+    bars = sorted({g['bars'] for g in rows})
+    return dict(Rebar='; '.join(bars), Rebar_kg=round(sum(g['kg'] for g in rows), 1), MaxSpan_m=max(g['span'] for g in rows), Note=DNOTE)
+
+
+def elec(key, default):
+    """cable / board text from the electrical design, else the assumed default"""
+    el = DESIGN.get('electrical')
+    if not el:
+        return default
+    f = {x['name']: x for x in el['feeders']}
+    m = el['main']
+    return {'main': 'Main feeder %s, buried 0.65 m, sand bed + warning tape (Vd %.2f%%)' % (m['cable'], m['vd']),
+            'A': 'Sub-feeder %s in %s, MDB -> CU-A, MCB %dA (Vd %.2f%%)' % (f['E-FD-A']['cable'], f['E-FD-A']['conduit'], f['E-FD-A']['cb'], f['E-FD-A']['vd']),
+            'C': 'Sub-feeder 3-phase %s in %s, MDB -> CU-C, MCB 3P %dA (Vd %.2f%%)' % (f['E-FD-C']['cable'], f['E-FD-C']['conduit'], f['E-FD-C']['cb'], f['E-FD-C']['vd']),
+            'mdb': 'MDB load centre 3-phase, main %s, meter %s, 12 ways' % (m['main_cb'], m['meter']),
+            'cuc': 'Consumer unit 3-phase 4-wire, main 3P %dA + RCBO/RCD 30 mA, 12 ways (building C)' % f['E-FD-C']['cb'],
+            'cua': 'Consumer unit 1-phase, main %dA + RCBO/RCD 30 mA, 10 ways (building A)' % f['E-FD-A']['cb']}[key]
+
+
 def post(F, name, a, b, z0, z1, size=0.15, mat='timber_dark', footing=True, stump_top=None, fnd_mat='concrete'):
     add('IfcColumn', name, 'TC', 'GF', 'S-Column', F.box(a - size / 2, a + size / 2, b - size / 2, b + size / 2, z0, z1, mat),
         Section='%dx%d reclaimed hardwood post' % (size * 1000, size * 1000), Height_m=round(z1 - z0, 2))
     if footing:
         st = z0 if stump_top is None else stump_top
-        add('IfcFooting', 'F-' + name, 'F1', 'FND', 'S-Foundation', F.box(a - .4, a + .4, b - .4, b + .4, -1.20, -0.95, fnd_mat),
-            Size_m='0.80x0.80x0.25', Note='Footing ASSUMED (no soil data, no structural design)')
+        d = DESIGN.get('footings', {}).get('F-' + name)
+        B, h = (d['B'], d['h']) if d else (0.80, 0.25)
+        fa = dict(Size_m='%.2fx%.2fx%.2f' % (B, B, h), Note='Footing ASSUMED (no soil data, no structural design)')
+        if d:
+            fa = dict(Size_m=fa['Size_m'], Type=d['type'], Rebar=d['bars'], Rebar_kg=d['kg'], Ps_kN=d['Ps'], Pu_kN=d['Pu'],
+                      Bearing_kPa=d['q'], Note=DNOTE)
+        add('IfcFooting', 'F-' + name, d['type'] if d else 'F1', 'FND', 'S-Foundation',
+            F.box(a - B / 2, a + B / 2, b - B / 2, b + B / 2, -0.95 - h, -0.95, fnd_mat), **fa)
         if st > -0.95:
-            add('IfcColumn', 'ST-' + name, 'ST', 'FND', 'S-Column', F.box(a - .1, a + .1, b - .1, b + .1, -0.95, st, fnd_mat),
-                Section='0.20x0.20 RC stump', Note='ASSUMED')
+            sa = dict(Section='0.20x0.20 RC stump', Note='ASSUMED')
+            if d:
+                sa = dict(Section='0.20x0.20 RC stump', Rebar=d['stump']['bars'], Rebar_kg=d['stump']['kg'], Note=DNOTE)
+            add('IfcColumn', 'ST-' + name, 'ST', 'FND', 'S-Column', F.box(a - .1, a + .1, b - .1, b + .1, -0.95, st, fnd_mat), **sa)
 
 
 def beam(F, name, axis, c, s0, s1, ztop, h=0.20, w=0.10, mat='timber_dark', mark='TB', tag='S-Beam'):
@@ -348,7 +383,7 @@ for y0, y1, x0, x1 in ((AYN, AYN, AX0, AX1), (AYS, AYS, AX0, ABX), (ABYS, ABYS, 
     gb.append(box(x0 - .1, x1 + .1, y0 - .1, y0 + .1, -0.10, 0.30, 'concrete'))
 for x, y0, y1 in ((AX0, AYS, AYN), (ABX, ABYS, AYN), (AX1, ABYS, AYN)):
     gb.append(box(x - .1, x + .1, y0 + .1, y1 - .1, -0.10, 0.30, 'concrete'))
-add('IfcBeam', 'A-GB', 'GB1', 'FND', 'S-Beam', gb, Section='0.20x0.40 RC grade beam', Note='ASSUMED')
+add('IfcBeam', 'A-GB', 'GB1', 'FND', 'S-Beam', gb, Section='0.20x0.40 RC grade beam', **gb_attrs('A-GB'))
 
 A_POSTS_X = [AX0, ABAX, 4.425, 6.875, ABX, AX1]
 for x in A_POSTS_X:
@@ -433,7 +468,7 @@ gb = [box(CX0 - .1, CXB + .1, CYN - .1, CYN + .1, -0.10, 0.30, 'concrete'), box(
       box(CXM - .1, CXE + .1, CYB2 - .1, CYB2 + .1, -0.10, 0.30, 'concrete'), box(CXE - .1, CXB + .1, CYM - .1, CYM + .1, -0.10, 0.30, 'concrete'),
       box(CX0 - .1, CX0 + .1, CYS + .1, CYN - .1, -0.10, 0.30, 'concrete'), box(CXM - .1, CXM + .1, CYB2 + .1, CYS - .1, -0.10, 0.30, 'concrete'),
       box(CXE - .1, CXE + .1, CYB2 + .1, CYM - .1, -0.10, 0.30, 'concrete'), box(CXB - .1, CXB + .1, CYM + .1, CYN - .1, -0.10, 0.30, 'concrete')]
-add('IfcBeam', 'C-GB', 'GB1', 'FND', 'S-Beam', gb, Section='0.20x0.40 RC grade beam', Note='ASSUMED')
+add('IfcBeam', 'C-GB', 'GB1', 'FND', 'S-Beam', gb, Section='0.20x0.40 RC grade beam', **gb_attrs('C-GB'))
 for nm, x, y in (('W-S', CX0, CYS), ('W-M', CX0, CYM), ('W-N', CX0, CYN), ('M-S', CXM, CYS), ('M-M', CXM, CYM), ('M-N', CXM, CYN),
                  ('M-B', CXM, CYB2), ('E-B', CXE, CYB2), ('E-S', CXE, CYS), ('E-M', CXE, CYM), ('E-N', CXE, CYN),
                  ('B-M', CXB, CYM), ('B-N', CXB, CYN)):
@@ -684,17 +719,17 @@ add('IfcElectricDistributionPoint', 'E-POLE', 'MP', 'GF', 'E-Power', [I.bar((UTI
     box(UTIL[0] - 0.2, UTIL[0] + 0.2, UTIL[1] - 0.15, UTIL[1] - 0.09, 1.4, 1.9, 'elec')],
     Description='Concrete pole 6.0 m + PEA kWh meter 15(45)A 3-phase 4-wire (ASSUMED supply)', Count=1, Item='e_meter', Note=MEP_NOTE)
 things('IfcElectricDistributionPoint', 'E-MDB', 'MDB', 'E-Power', [(MDB[0], MDB[1], 1.5)], (0.45, 0.45, 0.6), 'elec', 'e_mdb',
-       'MDB load centre 3-phase, main MCCB 3P 63A + RCBO, 12 ways')
+       elec('mdb', 'MDB load centre 3-phase, main MCCB 3P 63A + RCBO, 12 ways'))
 things('IfcElectricDistributionPoint', 'E-CU-A', 'CU', 'E-Power', [(CUA[0], CUA[1], FFL + 1.5)], (0.08, 0.35, 0.45), 'elec', 'e_cu',
-       'Consumer unit 1-phase main 63A + RCBO, 10 ways (building A)')
-things('IfcElectricDistributionPoint', 'E-CU-C', 'CU', 'E-Power', [(CUC[0], CUC[1], FFL + 1.5)], (0.08, 0.35, 0.45), 'elec', 'e_cu',
-       'Consumer unit 1-phase main 63A + RCBO, 12 ways (building C)')
+       elec('cua', 'Consumer unit 1-phase main 63A + RCBO, 10 ways (building A)'))
+things('IfcElectricDistributionPoint', 'E-CU-C', 'CU', 'E-Power', [(CUC[0], CUC[1], FFL + 1.5)], (0.08, 0.35, 0.45), 'elec', 'e_cu3' if DESIGN.get('electrical') else 'e_cu',
+       elec('cuc', 'Consumer unit 1-phase main 63A + RCBO, 12 ways (building C)'))
 run('E-FD-MAIN', 'UG', 'E-Power', [(UTIL[0], UTIL[1], EZ), (23.4, -8.0, EZ), (MDB[0], MDB[1], EZ), (MDB[0], MDB[1], 1.2)], 0.06, 'conduit',
-    'e_fd_main', 'Main feeder NYY 4x25 mm2 in HDPE 50 mm, buried 0.65 m, sand bed + warning tape')
+    'e_fd_main', elec('main', 'Main feeder NYY 4x25 mm2 in HDPE 50 mm, buried 0.65 m, sand bed + warning tape'))
 run('E-FD-A', 'UG', 'E-Power', [(MDB[0], MDB[1], EZ), (16.5, -2.2, EZ), (10.5, 2.5, EZ), (2.6, 2.5, EZ), (2.6, 8.5, EZ), (CUA[0], CUA[1], EZ),
-    (CUA[0], CUA[1], FFL + 1.3)], 0.05, 'conduit', 'e_fd_sub16', 'Sub-feeder NYY 2x16 + G 10 mm2 in HDPE 40 mm, MDB -> CU-A')
+    (CUA[0], CUA[1], FFL + 1.3)], 0.05, 'conduit', 'e_fd_a', elec('A', 'Sub-feeder NYY 2x16 + G 10 mm2 in HDPE 40 mm, MDB -> CU-A'))
 run('E-FD-C', 'UG', 'E-Power', [(MDB[0], MDB[1], EZ), (21.0, -1.0, EZ), (21.0, 5.0, EZ), (CUC[0], CUC[1], EZ), (CUC[0], CUC[1], FFL + 1.3)],
-    0.05, 'conduit', 'e_fd_sub25', 'Sub-feeder NYY 2x25 + G 16 mm2 in HDPE 40 mm, MDB -> CU-C')
+    0.05, 'conduit', 'e_fd_c', elec('C', 'Sub-feeder NYY 2x25 + G 16 mm2 in HDPE 40 mm, MDB -> CU-C'))
 run('E-FD-SITE', 'UG', 'E-Power', [(MDB[0], MDB[1], EZ), (16.0, -2.4, EZ), (13.6, -1.9, EZ), (8.4, 0.9, EZ), (4.0, 3.2, EZ),
     (17.3, 2.0, EZ), (21.0, 2.0, EZ)], 0.04, 'conduit', 'e_fd_site', 'Garden lighting NYY 3x2.5 mm2 in HDPE 25 mm')
 run('E-FD-PUMP', 'UG', 'E-Power', [(MDB[0], MDB[1], EZ), (PUMP[0], PUMP[1], EZ), (PUMP[0], PUMP[1], 0.3)], 0.04, 'conduit', 'e_fd_pump',

@@ -11,7 +11,9 @@ reclaimed door (D01–D20) and window (W01–W12) schedules, a door and window a
 | `make_model.py` | Parametric source: every dimension lives here. Edit it, then run `python3 make_model.py` |
 | `BaanSaoYongHin_BIM.rb` | SketchUp Ruby script (generated): `load` it, then `BaanSaoYongHinBIM.build` |
 | `model.js` + `preview.html` | Browser 3D preview (generated data, three.js from `../../web/house-bim-studio/vendor`) |
-| `boq.py` | Take-off from the model → BOQ → CPM plan → S-curve → payments. Run `python3 boq.py` after `make_model.py` |
+| `boq.py` | Take-off from the model → BOQ → CPM plan → S-curve → payments |
+| `design_calc.py`, `design_report.py` | Preliminary foundation design and electrical load calculation from the model → `design/design_results.json` + `design/design_report.pdf` (Thai) |
+| `run_all.py` | Rebuild everything in order: model → design → model with designed sizes → BOQ → report |
 | `BaanSaoYongHin_BOQ_Plan.xlsx` | สรุป (ปร.5), BOQ (ปร.4, formulas), ถอดปริมาณ (every quantity traced to a BIM element), ประตูหน้าต่าง, แผนงาน (CPM + Gantt), S-Curve, งวดงาน, ข้อสมมติ |
 | `tracker/` | Construction tracker web app (`index.html` + generated `plan.js`); see below |
 | `door_window_schedule.csv` | The 32 reclaimed marks (40 physical units) with sizes, pieces available, placed, spare, and where each is used |
@@ -43,8 +45,8 @@ must design them (EIT standards) before construction.
 
 | | |
 |---|---|
-| Direct cost | 2,908,023 baht (structure 1.12 M, architecture 1.24 M, plumbing 0.23 M, electrical 0.32 M) |
-| × Factor F 1.2846 | **3,735,647 baht** ≈ 18,977 baht/m² of building slab (196.85 m², decks extra) |
+| Direct cost | 2,893,987 baht (structure 1.10 M, architecture 1.24 M, plumbing 0.23 M, electrical 0.32 M) |
+| × Factor F 1.2846 | **3,717,616 baht** ≈ 18,886 baht/m² of building slab (196.85 m², decks extra) |
 | Plan | 36 activities, 98 working days (Mon–Sat, listed public holidays off), 2 Nov 2026 → 1 Mar 2027 |
 | Payments | 8 milestone payments, each valued at the cost of the activities it closes |
 
@@ -53,7 +55,35 @@ element in the `ถอดปริมาณ` sheet. Unit prices are 2026 estimat
 BIM Studio) and are blue input cells in the `BOQ` sheet; the summary, plan costs, S-curve and payments are
 formulas, so changing a price updates everything (1,133 formulas, recalculated with no errors). Factor F and the
 start date are assumptions, marked yellow. Changing geometry or the start date: edit `make_model.py` / `boq.py`
-and run both again.
+and run `python3 run_all.py`.
+
+## Preliminary design (`design_calc.py` → `design/design_report.pdf`)
+
+Calculations read the model directly (post positions, roof and wall geometry, fixture and outlet positions,
+cable routes) and write the results back into the model and BOQ.
+
+**Foundations** (ACI 318-19 SI, EIT practice; f'c 240 ksc, SD40 / SR24):
+
+- Column loads by tributary area: roof sheets, rafters and purlins, ceilings, walls, doors/windows and timber
+  beams are weighed from the model and given to the nearest supporting post. Loads are small (D + Lr ≤ 34 kN).
+- All 49 pad footings: **F1 0.70 × 0.70 × 0.25 m, 4-DB12 @0.18 each way with 90° hooks**, base at −1.20 m
+  (bearing ≤ 92 kPa, punching, one-way shear, flexure and hook development all checked).
+- RC stumps 0.20 × 0.20 with 4-DB12 and RB9 @0.15; grade beams 0.20 × 0.40 with 3-DB12 top and bottom and RB6 @0.15.
+- Wind uplift (V50 25 m/s, open garage CgCp −2.0) is resisted by footing + soil weight on every post; post-to-stump
+  connection: 2 steel side plates + 2 M12 through-bolts. Deck piers on 0.40 × 0.40 pads.
+- Rebar now comes from the design (1,379 kg) instead of kg/m³ ratios.
+
+**Electrical** (EIT wiring standard approach):
+
+- Connected load 24.3 kVA, demand 24.5 kVA, 36 A per phase after balancing → meter 15(45)A 3-phase, main 3P 40A.
+- Building C's board changes to 3-phase (its two 4.5 kW water heaters would put > 60 A on one phase).
+- Main NYY 4×16, feeder A NYY 2×10 + G 10, feeder C NYY 4×10 + G 4; all branch circuits 2.5 mm² minimum,
+  water heaters 6 mm² on 32 A RCBO; worst total voltage drop 3.1 % (limit 5 %).
+
+**Not covered yet / to be confirmed:** no soil data (qa = 100 kPa is assumed: a soil test must confirm it);
+the timber superstructure (posts, beams, rafters, lateral bracing) is not designed; cable ampacities and
+grounding sizes must be checked against the current EIT tables and the meter size confirmed with PEA. A licensed
+civil and electrical engineer must check and sign before construction.
 
 ## Construction tracker (`tracker/index.html`)
 
@@ -80,9 +110,9 @@ recorded actual start/finish dates), daily site reports, issues and defects, pay
   W03, W04 and W11. (By mark: 25 of the 32 marks are used at least once.)
 - **Heights and roof pitches: estimated** from photos. Floor +0.45, wall plate +3.10 (A) / +2.95 (C) /
   +2.70 (D), pitches 30° / 45° / 25°.
-- **Structure: assumed.** Timber posts 0.15–0.20, footings 0.80 × 0.80, 0.20 × 0.40 grade beams, rafters
-  50×150 @ about 1.0 m, purlins 50×100 @ 0.80. None of it has been designed. An architect and a structural
-  engineer must set the real sizes before this is used for permits, BOQ or construction.
+- **Foundations: preliminary design** (see above), based on an assumed bearing capacity.
+- **Timber superstructure: assumed.** Timber posts 0.15–0.20, rafters 50×150 @ about 1.0 m, purlins 50×100 @ 0.80
+  have not been designed. A structural engineer must set the real sizes before this is used for permits or construction.
 - `Gemini_Generated_Image_*.png` in the archive shows a different flat-roof house, so it is not modelled.
 
 ## Commands in SketchUp (Ruby Console)
