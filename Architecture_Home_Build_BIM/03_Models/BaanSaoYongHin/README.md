@@ -30,6 +30,10 @@ reclaimed door (D01–D20) and window (W01–W12) schedules, a door and window a
 | **Electrical (E-)** | PEA pole + 3-phase meter, MDB in store room 2, consumer units in A and C, buried NYY feeders in HDPE, 61 light points (pendants, downlights, wall/post lamps, battens, floods, bollards), 33 sockets, 19 switches, 3 water heaters, 3 split ACs, 4 ground rods |
 | **Ceilings** | Woven-bamboo sloped ceiling in A (photo 23), timber T&G ceilings in C and the garage rooms (hidden in the preview; tag `A-Ceiling`) |
 
+Each element is an IFC 2x3 classified group (IfcWall, IfcDoor, IfcWindow, IfcColumn, IfcBeam, IfcMember,
+IfcRoof, IfcSlab, IfcFooting, IfcPipeSegment, IfcLightFixture, IfcOutlet, …) with a tag (`S-*`, `A-*`, `P-*`, `E-*`, `Site`) and attributes
+(`BSY_BIM` dictionary: mark, size, section, schedule reference, notes).
+
 ![MEP view (roofs and walls hidden)](preview_mep.png)
 
 The MEP layout, cable sizes and pipe sizes are a sketch for estimating. A licensed MEP / electrical engineer
@@ -63,10 +67,6 @@ state on any date), daily site reports, issues and defects, payment milestones a
   copy in `../../../web/house-bim-studio/vendor/` when offline.
 - `screenshot_*_sample.png` show it with made-up sample progress, for illustration only.
 
-
-Each element is an IFC 2x3 classified group (IfcWall, IfcDoor, IfcWindow, IfcColumn, IfcBeam, IfcMember,
-IfcRoof, IfcSlab, IfcFooting, …) with a tag (`S-*`, `A-*`, `P-*`, `Site`) and attributes
-(`BSY_BIM` dictionary: mark, size, section, schedule reference, notes).
 
 ## How sure each number is
 
