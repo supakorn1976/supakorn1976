@@ -656,13 +656,20 @@ wst.auto_filter.ref = 'A1:I%d' % (len(TRACE) + 1)
 
 # ---------------- ประตูหน้าต่าง
 wsd = wb.create_sheet('ประตูหน้าต่าง')
-hdr(wsd, 1, ['รหัส', 'ประเภท', 'กว้าง (ม.)', 'สูง (ม.)', 'จำนวนที่มี', 'ใช้ในโมเดล', 'ตำแหน่ง'], [8, 10, 10, 10, 11, 11, 60])
+hdr(wsd, 1, ['รหัส', 'ประเภท', 'กว้าง (ม.)', 'สูง (ม.)', 'จำนวนที่มี (ชิ้น)', 'ติดตั้งในโมเดล (ชิ้น)', 'สำรอง (ชิ้น)', 'ตำแหน่ง'],
+    [8, 10, 10, 10, 13, 15, 11, 60])
 for i, m in enumerate(sorted(mm.SCHED), 2):
     h, w, n = mm.SCHED[m]
     used = mm.PLACED.get(m, [])
-    for c, v in enumerate([m, 'ประตู' if m[0] == 'D' else 'หน้าต่าง', w, h, n, len(used), ', '.join(used) or '(สำรอง)'], 1):
+    for c, v in enumerate([m, 'ประตู' if m[0] == 'D' else 'หน้าต่าง', w, h, n, len(used), '=E%d-F%d' % (i, i), ', '.join(used) or '(สำรองทั้งหมด)'], 1):
         wsd.cell(row=i, column=c, value=v)
-    style_row(wsd, i, 7, fmt={3: '0.00', 4: '0.00'})
+    style_row(wsd, i, 8, fmt={3: '0.00', 4: '0.00'})
+nr = len(mm.SCHED) + 2
+wsd.cell(row=nr, column=2, value='รวม %d รหัส' % len(mm.SCHED))
+for c, col in ((5, 'E'), (6, 'F'), (7, 'G')):
+    wsd.cell(row=nr, column=c, value='=SUM(%s2:%s%d)' % (col, col, nr - 1))
+style_row(wsd, nr, 8, f_b, fill_cat)
+wsd.cell(row=nr + 2, column=2, value='นับเป็นชิ้นจริง: W03, W04, W11 มีรหัสละ 3 ชิ้น และ W05, W06 มีรหัสละ 2 ชิ้น ตามตารางในแบบ ("3 PIECES") ส่วนรหัสอื่นมีรหัสละ 1 ชิ้น').font = f_n
 
 # ---------------- แผนงาน (CPM + Gantt by week)
 wsp = wb.create_sheet('แผนงาน')

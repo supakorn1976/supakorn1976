@@ -14,7 +14,7 @@ reclaimed door (D01–D20) and window (W01–W12) schedules, a door and window a
 | `boq.py` | Take-off from the model → BOQ → CPM plan → S-curve → payments. Run `python3 boq.py` after `make_model.py` |
 | `BaanSaoYongHin_BOQ_Plan.xlsx` | สรุป (ปร.5), BOQ (ปร.4, formulas), ถอดปริมาณ (every quantity traced to a BIM element), ประตูหน้าต่าง, แผนงาน (CPM + Gantt), S-Curve, งวดงาน, ข้อสมมติ |
 | `tracker/` | Construction tracker web app (`index.html` + generated `plan.js`); see below |
-| `door_window_schedule.csv` | All 32 reclaimed units with their sizes, and where each one is used in the model |
+| `door_window_schedule.csv` | The 32 reclaimed marks (40 physical units) with sizes, pieces available, placed, spare, and where each is used |
 | `preview_*.png` | Screenshots of the preview (SW, iso, plan) |
 | `reference/` | The source sheets used: scaled site plan, door/window schedules, door/window axonometric |
 
@@ -74,8 +74,10 @@ recorded actual start/finish dates), daily site reports, issues and defects, pay
 - **Plan positions and sizes: measured.** They come from the plan with its 10 m scale bar (24.6 px/m; the
   pickup in the garage checks out at about 5.3 m). They are accurate to about ±0.2 m.
 - **Door and window sizes: real.** They are taken from the reclaimed-unit schedule sheets. Where each unit
-  sits is estimated from the plan, the axonometric and the photos. 25 of the 32 units are placed; the other 7
-  are listed as spares. "3 PIECES" on the sheet is read as 3 units available.
+  sits is estimated from the plan, the axonometric and the photos. The sheets list 32 marks but 40 physical units:
+  W03, W04 and W11 have 3 pieces each and W05, W06 have 2 ("3 PIECES" on the sheet is read as 3 units available).
+  30 units are installed in the model and 10 are spare: doors D01, D04, D05, D06, D09, D10, D11 and one each of
+  W03, W04 and W11. (By mark: 25 of the 32 marks are used at least once.)
 - **Heights and roof pitches: estimated** from photos. Floor +0.45, wall plate +3.10 (A) / +2.95 (C) /
   +2.70 (D), pitches 30° / 45° / 25°.
 - **Structure: assumed.** Timber posts 0.15–0.20, footings 0.80 × 0.80, 0.20 × 0.40 grade beams, rafters

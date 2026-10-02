@@ -849,12 +849,19 @@ def main():
             f, ensure_ascii=False, separators=(',', ':'))
         f.write(';\n')
     # reclaimed door / window catalogue: every schedule item + where it is used in the model
+    over = {m: len(v) for m, v in PLACED.items() if len(v) > SCHED[m][2]}
+    assert not over, 'more units placed than the schedule has: %s' % over
     with open(os.path.join(HERE, 'door_window_schedule.csv'), 'w', encoding='utf-8') as f:
-        f.write('Mark,Type,Width_m,Height_m,Pieces,PlacedIn\n')
+        f.write('Mark,Type,Width_m,Height_m,Pieces,Placed,Spare,PlacedIn\n')
         for m in sorted(SCHED):
             h, w, n = SCHED[m]
-            f.write('%s,%s,%.2f,%.2f,%d,%s\n' % (m, 'Door' if m[0] == 'D' else 'Window', w, h, n, ' '.join(PLACED.get(m, [])) or '(spare - not placed)'))
-    print('elements:', len(E), ' parts:', sum(len(e[5]) for e in E), ' schedule items placed:', len(PLACED), '/', len(SCHED))
+            used = PLACED.get(m, [])
+            f.write('%s,%s,%.2f,%.2f,%d,%d,%d,%s\n' % (m, 'Door' if m[0] == 'D' else 'Window', w, h, n, len(used), n - len(used),
+                                                    ' '.join(used) or '(spare - not placed)'))
+    units = sum(v[2] for v in SCHED.values())
+    placed = sum(len(v) for v in PLACED.values())
+    print('elements:', len(E), ' parts:', sum(len(e[5]) for e in E),
+          ' reclaimed units placed: %d of %d (%d spare; %d of %d marks used)' % (placed, units, units - placed, len(PLACED), len(SCHED)))
 
 
 if __name__ == '__main__':
