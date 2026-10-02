@@ -58,8 +58,9 @@ and run both again.
 ## Construction tracker (`tracker/index.html`)
 
 One page for the site team: progress per activity, Gantt with % done and actual dates, planned-vs-actual S-curve,
-SPI and forecast finish, a 4D model coloured by status (done / in progress / late / not started, or the planned
-state on any date), daily site reports, issues and defects, payment milestones and BOQ value earned.
+SPI and forecast finish, a 4D model coloured by status (done / in progress / late / not started) with a time
+slider and play button (plan mode runs to the planned finish; actual mode runs to the report date and uses the
+recorded actual start/finish dates), daily site reports, issues and defects, payment milestones and BOQ value earned.
 
 - On claude.ai (published artifact) the data is shared between everyone who opens it (`db`: `progress`, `logs`,
   `issues`, `payments`, `history`).

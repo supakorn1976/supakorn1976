@@ -97,6 +97,12 @@ dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--s
 dialog::backdrop { background: rgba(10, 16, 14, .45) }
 #view3d { position: relative; height: min(70vh, 620px); min-height: 340px; background: var(--scene); border-radius: 6px; overflow: hidden }
 #view3d canvas { display: block; width: 100%; height: 100% }
+.timebar { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-top: 12px }
+.timetrack { flex: 1 1 260px; min-width: 0; display: grid; gap: 2px }
+.timehead { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline }
+.timehead b { font-size: 15px }
+.timeends { display: flex; justify-content: space-between }
+#slider4d { padding: 0; border: 0; background: none; accent-color: var(--accent) }
 #info3d { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 12.5px }
 #info3d:empty { display: none }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 20 }
@@ -187,7 +193,7 @@ svg .axis { stroke: var(--line) } svg .lbl { fill: var(--muted); font: 11px var(
       <h2>โมเดล 4D</h2>
       <div class="row">
         <label for="mode4d" style="display:flex;gap:6px;align-items:center">แสดง
-          <select id="mode4d" style="width:auto"><option value="actual">สถานะจริง ณ วันที่รายงาน</option><option value="plan">ตามแผน ณ วันที่รายงาน</option></select></label>
+          <select id="mode4d" style="width:auto"><option value="actual">สถานะจริง</option><option value="plan">ตามแผน</option></select></label>
       </div>
     </div>
     <div class="legend" style="margin-bottom:10px">
@@ -196,6 +202,16 @@ svg .axis { stroke: var(--line) } svg .lbl { fill: var(--muted); font: 11px var(
       <span>ลากหมุน · ล้อเลื่อนซูม · คลิกดูชิ้นส่วน</span>
     </div>
     <div id="view3d"><div id="info3d"></div></div>
+    <div class="timebar">
+      <button class="btn" type="button" id="play4d" aria-label="เล่นลำดับการก่อสร้าง">▶ เล่น</button>
+      <div class="timetrack">
+        <div class="timehead"><b class="mono" id="date4d"></b><span class="hint" id="sum4d"></span></div>
+        <input type="range" id="slider4d" min="0" max="0" step="1" value="0" aria-label="เลื่อนวันที่ในโมเดล 4D">
+        <div class="timeends hint"><span id="from4d"></span><span id="to4d"></span></div>
+      </div>
+      <button class="btn ghost" type="button" id="now4d">วันที่รายงาน</button>
+    </div>
+    <p class="hint" id="note4d" style="margin:6px 0 0"></p>
   </section>
 
   <!-- logs -->
@@ -406,7 +422,7 @@ svg .axis { stroke: var(--line) } svg .lbl { fill: var(--muted); font: 11px var(
   function render() {
     if (!P) return;
     renderOverview(); renderGantt(); renderCurve(); renderLogs(); renderIssues(); renderPay(); renderBoq();
-    if (scene3d) paint3d();
+    if (scene3d) { setIdx4d(idx4d, false); paint3d(); }
   }
 
   function renderOverview() {
@@ -656,21 +672,56 @@ svg .axis { stroke: var(--line) } svg .lbl { fill: var(--muted); font: 11px var(
     function resize() { const w = el.clientWidth, h = el.clientHeight; if (!w) return; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
     window.addEventListener('resize', resize);
     scene3d = { T, renderer, scene, cam, ctl, meshes, base, st, resize, css };
-    resize(); paint3d();
+    resize(); reset4d();
     (function loop() { requestAnimationFrame(loop); if (!$('view3d').closest('[hidden]')) { ctl.update(); renderer.render(scene, cam); } })();
   }
+  // ---------------- 4D time cursor: plan mode runs to the planned finish; actual mode stops at the report date
+  let idx4d = 0, play4d = 0;
+  const lastPlanIdx = () => P.acts.reduce((m, a) => Math.max(m, a.ef - 1), 0);
+  const idxOf = (day) => { let i = 0; while (i + 1 < CAL.length && CAL[i + 1] <= day) i++; return CAL[0] > day ? 0 : i; };
+  function max4d() { return $('mode4d').value === 'plan' ? lastPlanIdx() : Math.min(lastPlanIdx(), idxOf(statusDate)); }
+  function state4d(a, day) {
+    if ($('mode4d').value === 'plan') { const f = planFrac(a, day); return f >= 1 ? 'done' : f > 0 ? 'doing' : 'todo'; }
+    if (day >= statusDate) { const k = stateOf(a, statusDate); return k === 'late' && pctOf(a.code) === 0 && planFrac(a, statusDate) === 0 ? 'todo' : k; }
+    const pr = S.progress[a.code] || {}, pf = planFrac(a, day);
+    if (pr.aFinish && pr.aFinish <= day) return 'done';
+    if (pr.aStart && pr.aStart <= day) return pf >= 1 ? 'late' : 'doing';
+    return pf > 0 ? 'late' : 'todo';
+  }
+  function setIdx4d(i, repaint = true) {
+    const mx = max4d();
+    idx4d = Math.max(0, Math.min(mx, i));
+    const sl = $('slider4d'); sl.max = String(mx); sl.value = String(idx4d);
+    $('from4d').textContent = thd(CAL[0]); $('to4d').textContent = thd(CAL[mx]);
+    if (repaint) paint3d();
+  }
+  function reset4d() { stopPlay(); setIdx4d(idxOf(statusDate < P.start ? P.start : statusDate)); }
+  function stopPlay() { if (play4d) { clearInterval(play4d); play4d = 0; } $('play4d').textContent = '▶ เล่น'; }
+  function togglePlay() {
+    if (play4d) return stopPlay();
+    if (idx4d >= max4d()) setIdx4d(0);
+    $('play4d').textContent = '❚❚ หยุด';
+    play4d = setInterval(() => {
+      if ($('view3d').closest('[hidden]') || idx4d >= max4d()) return stopPlay();
+      setIdx4d(idx4d + 1);
+    }, 140);
+  }
   function paint3d() {
-    const s = scene3d, planMode = $('mode4d').value === 'plan';
+    const s = scene3d;
+    if (!s) return;
+    const day = CAL[idx4d], planMode = $('mode4d').value === 'plan';
     s.scene.background = new s.T.Color(s.css('--scene'));
+    const cnt = { done: 0, doing: 0, late: 0, todo: 0 }, st = {};
+    P.acts.forEach(a => { st[a.code] = state4d(a, day); cnt[st[a.code]]++; });
     for (const m of s.meshes) {
-      const a = m.userData.act && ACT[m.userData.act];
-      let k = 'done';
-      if (a) {
-        if (planMode) { const f = planFrac(a, statusDate); k = f >= 1 ? 'done' : f > 0 ? 'doing' : 'todo'; }
-        else { k = stateOf(a, statusDate); if (k === 'late' && pctOf(a.code) === 0 && planFrac(a, statusDate) === 0) k = 'todo'; }
-      }
+      const k = m.userData.act ? st[m.userData.act] || 'done' : 'done';
       m.material = k === 'done' ? (s.base[m.userData.mk] || s.base.concrete) : s.st[k];
     }
+    const wd = idx4d + 1;
+    $('date4d').textContent = toDate(day).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC' });
+    $('sum4d').textContent = `วันทำงานที่ ${wd} · แผนสะสม ${pct(PV(day))} · เสร็จ ${cnt.done} · กำลังทำ ${cnt.doing}` + (cnt.late ? ` · ล่าช้า ${cnt.late}` : '') + ` · ยังไม่เริ่ม ${cnt.todo} กิจกรรม`;
+    $('note4d').textContent = planMode ? 'โหมดตามแผน: เลื่อนได้ถึงวันเสร็จตามแผน' :
+      (statusDate < P.start ? 'ยังไม่ถึงวันเริ่มงาน — สลับเป็น “ตามแผน” เพื่อดูลำดับการก่อสร้าง' : 'โหมดสถานะจริง: เลื่อนได้ถึงวันที่รายงาน วันในอดีตใช้วันเริ่ม/เสร็จจริงที่บันทึกไว้');
   }
 
   // ------------------------------------------------------------ export
@@ -707,7 +758,7 @@ svg .axis { stroke: var(--line) } svg .lbl { fill: var(--muted); font: 11px var(
       if (i && db && canWrite) db.doc('issues/' + i.dataset.issue).update({ status: i.dataset.st, updatedAt: new Date().toISOString() }).catch(er => toast('บันทึกไม่สำเร็จ: ' + (er.message || er.code)));
     });
     document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-act][tabindex]')) { e.preventDefault(); openAct(e.target.dataset.act); } });
-    $('statusDate').addEventListener('change', () => { statusDate = $('statusDate').value || todayIso(); store.set('statusDate', $('statusDate').value || null); render(); });
+    $('statusDate').addEventListener('change', () => { statusDate = $('statusDate').value || todayIso(); store.set('statusDate', $('statusDate').value || null); if (scene3d) reset4d(); render(); });
     $('dlgPct').addEventListener('input', () => { $('dlgPctV').textContent = $('dlgPct').value + '%'; });
     $('actForm').addEventListener('submit', e => { if (e.submitter && e.submitter.value === 'save') saveAct(); });
     $('logForm').addEventListener('submit', async e => {
@@ -731,7 +782,10 @@ svg .axis { stroke: var(--line) } svg .lbl { fill: var(--muted); font: 11px var(
       catch (er) { toast('บันทึกไม่สำเร็จ: ' + (er.message || er.code)); }
     });
     $('boqCat').addEventListener('change', renderBoq); $('boqBld').addEventListener('change', renderBoq);
-    $('mode4d').addEventListener('change', () => { if (scene3d) paint3d(); });
+    $('mode4d').addEventListener('change', () => { stopPlay(); if (scene3d) setIdx4d($('mode4d').value === 'plan' ? idx4d : idxOf(statusDate)); });
+    $('slider4d').addEventListener('input', () => { stopPlay(); if (scene3d) setIdx4d(Number($('slider4d').value)); });
+    $('play4d').addEventListener('click', () => { if (scene3d) togglePlay(); });
+    $('now4d').addEventListener('click', () => { if (scene3d) reset4d(); });
     $('exportBtn').addEventListener('click', exportCsv);
     const t = store.get('tab', 'overview'); if (t !== 'overview') showTab(t);
   }
