@@ -1,0 +1,39 @@
+<!-- @dsCard height=288 -->
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Cover</title>
+<style>
+html,body{margin:0;height:288px;background:var(--bg);overflow:hidden}
+.wrap{position:relative;width:960px;height:288px}
+svg{position:absolute;inset:0}
+.accent{fill:var(--accent)} .ink{fill:var(--ink)} .muted{fill:var(--muted)}
+.cS{fill:var(--c-S)} .cA{fill:var(--c-A)} .cP{fill:var(--c-P)} .cE{fill:var(--c-E)}
+.plus{stroke:var(--bg);stroke-width:2}
+.r{rx:var(--r)}
+.name{position:absolute;left:32px;bottom:32px;max-width:440px;margin:0;font-family:var(--font-body);font-weight:600;font-size:80px;line-height:.95;color:var(--ink);letter-spacing:-.01em}
+.tag{position:absolute;left:32px;bottom:12px;max-width:440px;margin:0;font-family:var(--font-body);font-size:13px;color:var(--muted)}
+</style></head>
+<body><div class="wrap">
+<svg viewBox="0 0 960 288" width="960" height="288" aria-hidden="true">
+<!-- blocks: accent 224x192, ink 160x112, muted 160x64, discipline strip c-S/c-A/c-P/c-E 96/128/80/96 x 64 (space-16 multiples)
+     arrangement: a drawing-sheet title block; slab and ink bleed off the top, the strip is the CostBar at poster scale
+     pattern: plus grid cut from the accent slab, "drawing-sheet feel: hairline grids, mono figures" (the app's layout note)
+     scales: pitch 32 = 2 x space-16, gap space-16, corners radius r (6px) -->
+<rect class="accent r" x="560" y="-8" width="224" height="200"/>
+<rect class="ink r" x="800" y="-8" width="168" height="120"/>
+<rect class="muted r" x="800" y="128" width="168" height="64"/>
+<rect class="cS" x="560" y="208" width="96" height="64"/>
+<rect class="cA" x="656" y="208" width="128" height="64"/>
+<rect class="cP" x="784" y="208" width="80" height="64"/>
+<rect class="cE" x="864" y="208" width="104" height="64"/>
+<g class="plus" id="g"></g>
+</svg>
+<p class="name">House BIM<br>Studio</p>
+<p class="tag">Spec to 3D model, BOQ, schedule and S-Curve.</p>
+</div>
+<script>
+var g=document.getElementById('g'),s='';
+for(var x=592;x<=752;x+=32)for(var y=32;y<=160;y+=32)s+='<path d="M'+(x-5)+' '+y+'h10M'+x+' '+(y-5)+'v10"/>';
+g.innerHTML=s;
+</script>
+</body></html>
