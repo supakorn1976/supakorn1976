@@ -1,0 +1,20 @@
+<!-- @dsCard group="3D" height=330 -->
+<!doctype html>
+<html lang="th">
+<head><meta charset="utf-8"><title>preview</title>
+<style>body{padding:16px} .row{display:flex;flex-wrap:wrap;gap:var(--space-16);align-items:flex-start}</style></head>
+<body>
+<div class="vtools" style="margin-bottom:8px"><label><input type="checkbox" checked> โครงสร้าง</label><label><input type="checkbox" checked> ผนัง</label><label><input type="checkbox"> หลังคา</label><label><input type="checkbox" checked> เส้นขอบ</label></div>
+<div class="viewer" style="height:230px">
+  <svg viewBox="0 0 600 230" width="100%" height="100%" aria-label="ตัวอย่างโมเดล">
+    <polygon points="170,150 300,190 430,150 300,110" style="fill:var(--mat-ground)"/>
+    <polygon points="230,140 300,160 300,90 230,70" style="fill:var(--mat-wall-ext);stroke:var(--scene-edge)"/>
+    <polygon points="300,160 370,140 370,70 300,90" style="fill:var(--mat-concrete);stroke:var(--scene-edge)"/>
+    <polygon points="230,70 300,90 370,70 300,50" style="fill:var(--mat-roof);stroke:var(--scene-edge)"/>
+    <polygon points="250,120 280,129 280,100 250,91" style="fill:var(--mat-glass)"/>
+    <rect x="296" y="86" width="78" height="78" style="fill:none;stroke:var(--scene-select)"/>
+  </svg>
+  <div class="info"><h4>IfcColumn · C3</h4><dl><dt>ขนาด</dt><dd>0.25 × 0.25 × 3.20 ม.</dd><dt>วัสดุ</dt><dd>คอนกรีต 240 ksc</dd><dt>ชั้น</dt><dd>ชั้น 1</dd></dl></div>
+</div>
+</body>
+</html>

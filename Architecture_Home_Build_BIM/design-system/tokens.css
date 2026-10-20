@@ -1,0 +1,182 @@
+/* House BIM Studio — generated from tokens.json */
+:root, [data-theme="light"] {
+  --bg: #eef1f0;
+  --surface: #ffffff;
+  --sunk: #f6f8f7;
+  --ink: #15201c;
+  --muted: #56655f;
+  --line: #d3dbd8;
+  --line2: #e6ecea;
+  --accent: #1d5c86;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3edf4;
+  --crit: #b3261e;
+  --ok: #2b7a4b;
+  --warn: #9a5b00;
+  --c-S: #5b6770;
+  --c-A: #a8652f;
+  --c-P: #1f7a80;
+  --c-E: #b08900;
+  --gantt: #3e7ca8;
+  --scene: #e9edec;
+  --scene-edge: rgba(42, 47, 45, 0.28);
+  --scene-select: #d4372b;
+  --mat-concrete: rgb(196, 194, 188);
+  --mat-concrete-dark: rgb(150, 148, 142);
+  --mat-steel: rgb(70, 110, 150);
+  --mat-wall-ext: rgb(236, 230, 216);
+  --mat-wall-int: rgb(245, 242, 235);
+  --mat-wall-bath: rgb(200, 215, 220);
+  --mat-wood: rgb(140, 95, 60);
+  --mat-glass: rgba(150, 200, 190, 0.35);
+  --mat-breeze: rgb(240, 238, 232);
+  --mat-tile-floor: rgb(222, 218, 210);
+  --mat-tile-bath: rgb(190, 205, 210);
+  --mat-deck: rgb(160, 120, 85);
+  --mat-ceiling: rgb(250, 250, 248);
+  --mat-roof: rgb(120, 120, 118);
+  --mat-roof-clear: rgba(210, 230, 235, 0.45);
+  --mat-sanitary: rgb(252, 252, 252);
+  --mat-pipe: rgb(90, 90, 90);
+  --mat-light: rgb(255, 240, 170);
+  --mat-panel: rgb(60, 60, 60);
+  --mat-ground: rgb(150, 175, 120);
+  --mat-lean: rgb(170, 168, 160);
+  --mat-riprap: rgb(128, 118, 104);
+  --mat-gravel: rgb(188, 176, 150);
+  --mat-earth: rgba(176, 150, 110, 0.3);
+  --mat-lining: rgb(205, 203, 196);
+}
+[data-theme="dark"] {
+  --bg: #101614;
+  --surface: #172020;
+  --sunk: #131b1a;
+  --ink: #e4ebe8;
+  --muted: #9aaba4;
+  --line: #2c3a37;
+  --line2: #223030;
+  --accent: #6faed8;
+  --accent-ink: #0c1a22;
+  --accent-soft: #1b2e3a;
+  --crit: #f08a80;
+  --ok: #6cc596;
+  --warn: #e0a64a;
+  --c-S: #a3b1ba;
+  --c-A: #db9a62;
+  --c-P: #5cc3c9;
+  --c-E: #e2c24e;
+  --gantt: #6faed8;
+  --scene: #1a2322;
+  color-scheme: dark;
+}
+:root {
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-18: 18px;
+  --space-20: 20px;
+  --space-28: 28px;
+  --r: 6px;
+  --r-input: 4px;
+  --r-bar: 3px;
+  --r-pill: 999px;
+  --rail-width: 260px;
+  --breakpoint-stack: 860px;
+  --panel-min: 300px;
+  --kpi-min: 140px;
+  --field-min: 210px;
+  --viewer-max: 640px;
+  --font-body: "IBM Plex Sans Thai", system-ui, "Leelawadee UI", "Tahoma", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Consolas", monospace;
+}
+.t-title {
+  font-family: var(--font-body);
+  font-size: 19px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+.t-brand {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.t-heading {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+.t-body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.t-control {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.t-meta {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.t-label {
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+.t-note {
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.t-small {
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.t-eyebrow {
+  font-family: var(--font-body);
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.t-axis {
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  line-height: 1.2;
+  font-weight: 400;
+}
+.t-kpi {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+.t-num {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.t-code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 400;
+}
