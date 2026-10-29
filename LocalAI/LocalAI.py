@@ -12,6 +12,8 @@ Local AI Chat • Ollama — tkinter edition
   • โหมด Thinking (field "thinking" และแท็ก <think>…</think>) แบบพับ/ขยายได้
   • ตอบใหม่, ส่งออก .md, คัดลอกคำตอบ/โค้ด, แสดง tokens และ tok/s
   • คีย์ลัด: Enter ส่ง • Shift+Enter ขึ้นบรรทัด • Esc หยุด • Ctrl+N แชตใหม่
+  • คัดลอก/วาง: คลิกขวาที่ช่องพิมพ์หรือข้อความแชต (ตัด/คัดลอก/วาง/เลือกทั้งหมด)
+    และ Ctrl+C / Ctrl+V / Ctrl+X / Ctrl+A ใช้ได้แม้เปิดแป้นพิมพ์ภาษาไทยอยู่
 
 ใช้เฉพาะ Python standard library (ไม่ต้อง pip install อะไรเพิ่ม)
 """
@@ -59,6 +61,15 @@ INLINE_RE = re.compile(
 FENCE_RE = re.compile(r"^\s*```\s*([\w.+-]*)")
 LIST_RE = re.compile(r"^([-*]|\d+[.)])\s+(.+)")
 HOST_RE = re.compile(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", re.I)
+
+# keycode ของปุ่มตัวอักษร ใช้จับ Ctrl+C/V/X/A/N ตอนเปิดแป้นภาษาไทย (keysym จะเป็นอักษรไทย)
+if sys.platform == "win32":
+    CTRL_KEYCODES = {65: "a", 67: "c", 86: "v", 88: "x", 78: "n"}
+elif sys.platform == "darwin":
+    CTRL_KEYCODES = {}
+else:
+    CTRL_KEYCODES = {38: "a", 54: "c", 55: "v", 53: "x", 57: "n"}
+EDIT_EVENTS = {"c": "<<Copy>>", "v": "<<Paste>>", "x": "<<Cut>>"}
 
 
 def now_ms():
@@ -309,7 +320,10 @@ class App:
         ms.pack(side="right", fill="y")
         self.msg.pack(side="left", fill="both", expand=True)
         self.msg.bind("<Configure>", self.on_msg_resize)
+        # ให้คลิกแล้วรับโฟกัส เพื่อให้ Ctrl+C / Ctrl+A ใช้กับข้อความแชตได้
+        self.msg.bind("<Button-1>", lambda e: self.msg.focus_set(), add="+")
         self.setup_tags()
+        self.build_edit_menu()
 
     def _section(self, parent, text):
         tk.Label(parent, text=text, fg=C["muted"], bg=C["side"], font=self.f_label,
@@ -353,7 +367,9 @@ class App:
         self.prompt.bind("<Return>", self.on_enter)
         self.prompt.bind("<KP_Enter>", self.on_enter)
         self.prompt.bind("<KeyRelease>", lambda e: (self.resize_prompt(), self.update_placeholder()))
-        self.prompt.bind("<<Paste>>", lambda e: self.root.after(1, self.resize_prompt))
+        for ev in ("<<Paste>>", "<<Cut>>"):
+            self.prompt.bind(ev, lambda e: self.root.after(1, self.after_prompt_edit))
+        self.root.bind_all("<Control-KeyPress>", self.on_ctrl_key)
         self.root.bind_all("<Escape>", self.on_escape)
         self.root.bind_all("<Control-n>", lambda e: (self.new_chat(), "break")[1])
         self.root.bind_all("<Control-N>", lambda e: (self.new_chat(), "break")[1])
@@ -564,7 +580,11 @@ class App:
         is_user = m.get("role") == "user"
         if is_user:
             self.ins("คุณ\n", ("user_header",))
-            self.ins(" " + (m.get("content") or "").replace("\n", " \n ") + " \n", ("user",))
+            content = m.get("content") or ""
+            self.ins(" " + content.replace("\n", " \n ") + " \n", ("user",))
+            tag = self.dyn_tag("ucopy", lambda c=content: self.copy_text(c, "คัดลอกข้อความแล้ว"))
+            self.ins("⧉ คัดลอก", ("action", tag))
+            self.ins("\n", ("action",))
         else:
             name = m.get("model") or self.data["settings"].get("model") or "Local AI"
             self.ins("✦ " + name + "\n", ("ai_header",))
@@ -697,6 +717,107 @@ class App:
         self.root.clipboard_clear()
         self.root.clipboard_append(text)
         self.set_status("✓ " + msg)
+
+    # ------------------------------------------------------------ copy / paste
+    def build_edit_menu(self):
+        self.edit_menu = tk.Menu(self.root, tearoff=0, bg=C["panel"], fg=C["text"],
+                                 activebackground=C["accent"], activeforeground=C["accent_text"],
+                                 disabledforeground="#6c6e73", bd=0, font=self.f_base)
+        self.edit_menu.add_command(label="✂  ตัด", accelerator="Ctrl+X",
+                                   command=lambda: self.edit_action(self._menu_widget, "x"))
+        self.edit_menu.add_command(label="⧉  คัดลอก", accelerator="Ctrl+C",
+                                   command=lambda: self.edit_action(self._menu_widget, "c"))
+        self.edit_menu.add_command(label="📋  วาง", accelerator="Ctrl+V",
+                                   command=lambda: self.edit_action(self._menu_widget, "v"))
+        self.edit_menu.add_separator()
+        self.edit_menu.add_command(label="▣  เลือกทั้งหมด", accelerator="Ctrl+A",
+                                   command=lambda: self.edit_action(self._menu_widget, "a"))
+        self._menu_widget = None
+        # ผูกกับทุกช่องข้อความ (ช่องพิมพ์, ข้อความแชต, ช่องค้นหา, หน้าตั้งค่า)
+        buttons = ("<Button-3>", "<Button-2>") if sys.platform == "darwin" else ("<Button-3>",)
+        for cls in ("Text", "Entry", "TEntry", "TSpinbox"):
+            for b in buttons:
+                self.root.bind_class(cls, b, self.show_edit_menu, add="+")
+
+    @staticmethod
+    def _is_editable(w):
+        return isinstance(w, (tk.Text, tk.Entry, ttk.Entry))
+
+    @staticmethod
+    def _readonly(w):
+        if isinstance(w, ttk.Entry):
+            return w.instate(["readonly"]) or w.instate(["disabled"])
+        return str(w.cget("state")) == "disabled"
+
+    @staticmethod
+    def _has_selection(w):
+        if isinstance(w, tk.Text):
+            return bool(w.tag_ranges("sel"))
+        return bool(w.selection_present())
+
+    def _clipboard_text(self):
+        try:
+            return self.root.clipboard_get()
+        except tk.TclError:
+            return ""
+
+    def show_edit_menu(self, e):
+        w = e.widget
+        if not self._is_editable(w):
+            return
+        w.focus_set()
+        self._menu_widget = w
+        ro, sel = self._readonly(w), self._has_selection(w)
+        st = lambda ok: "normal" if ok else "disabled"
+        self.edit_menu.entryconfigure(0, state=st(sel and not ro))
+        self.edit_menu.entryconfigure(1, state=st(sel))
+        self.edit_menu.entryconfigure(2, state=st(not ro and bool(self._clipboard_text())))
+        self.edit_menu.tk_popup(e.x_root, e.y_root)
+        return "break"
+
+    def edit_action(self, w, key):
+        """ตัด/คัดลอก/วาง/เลือกทั้งหมด ในช่องข้อความ w"""
+        if w is None or not self._is_editable(w):
+            return
+        w.focus_set()
+        if key == "a":
+            if isinstance(w, tk.Text):
+                w.tag_remove("sel", "1.0", "end")
+                w.tag_add("sel", "1.0", "end-1c")
+                w.mark_set("insert", "end-1c")
+            else:
+                w.selection_range(0, "end")
+                w.icursor("end")
+            return
+        if key in ("x", "v") and self._readonly(w):
+            return
+        if key == "c" and not self._has_selection(w):
+            return
+        if key == "v" and isinstance(w, tk.Text) and self._has_selection(w):
+            w.delete("sel.first", "sel.last")  # วางทับข้อความที่เลือกไว้ (Linux ไม่ทำให้เอง)
+        w.event_generate(EDIT_EVENTS[key])
+        if key == "c":
+            self.set_status("✓ คัดลอกแล้ว")
+
+    def on_ctrl_key(self, e):
+        """รองรับ Ctrl+A ทุกช่อง และ Ctrl+C/V/X/N เมื่อแป้นพิมพ์ไม่ใช่ภาษาอังกฤษ"""
+        ks = (e.keysym or "").lower()
+        if ks in EDIT_EVENTS or ks == "n":
+            return None  # แป้นภาษาอังกฤษ: tkinter จัดการเองอยู่แล้ว
+        key = "a" if ks == "a" else CTRL_KEYCODES.get(e.keycode)
+        if not key:
+            return None
+        if key == "n":
+            self.new_chat()
+            return "break"
+        if not self._is_editable(e.widget):
+            return None
+        self.edit_action(e.widget, key)
+        return "break"
+
+    def after_prompt_edit(self):
+        self.resize_prompt()
+        self.update_placeholder()
 
     def toggle_sidebar(self):
         if self.sidebar.winfo_ismapped():
