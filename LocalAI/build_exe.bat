@@ -11,8 +11,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Installing / updating PyInstaller...
-python -m pip install --upgrade pyinstaller || goto :fail
+echo Installing / updating PyInstaller and pypdf (for reading PDF)...
+python -m pip install --upgrade pyinstaller pypdf || goto :fail
 
 echo Building LocalAI.exe ...
 python -m PyInstaller --noconfirm --clean --onefile --windowed --name LocalAI LocalAI.py || goto :fail

@@ -9,7 +9,10 @@ Local AI Chat • Ollama — tkinter edition
   • เลือก/โหลดรายชื่อโมเดล (/api/tags)
   • ประวัติแชต: ค้นหา เปลี่ยนชื่อ ลบ (บันทึกเป็นไฟล์ JSON ในโฟลเดอร์ home)
   • แสดงผล Markdown (หัวข้อ, ลิสต์, ตาราง, โค้ดบล็อก, ตัวหนา/เอียง, ลิงก์, quote)
-  • แนบไฟล์ข้อความ/โค้ด และรูป (PNG/JPG/WEBP สำหรับโมเดลที่ดูรูปได้)
+  • แนบไฟล์ข้อความ/โค้ด, PDF, Word (.docx) และรูป (PNG/JPG/WEBP สำหรับโมเดลที่ดูรูปได้)
+    — กดปุ่มแนบ, ลากไฟล์มาวาง (Windows) หรือ Ctrl+V รูป/ไฟล์ที่คัดลอกไว้
+  • แก้ไขข้อความที่ส่งไปแล้ว แล้วให้ตอบใหม่ (✎ แก้ไข ใต้ข้อความ)
+  • รูปที่แนบเก็บแยกในโฟลเดอร์ ~/.local_ai_ollama_images
   • คำตอบยาวไม่หน่วง: ระหว่าง stream วาดใหม่เฉพาะย่อหน้าท้าย
   • ไฮไลต์สีโค้ด (Python, JS/TS/Java/C/C#/Go/Rust/PHP, SQL, Shell, JSON)
   • จัดการโมเดล: ดาวน์โหลดพร้อมแถบความคืบหน้า, ดูข้อมูล, ลบ
@@ -26,10 +29,14 @@ Local AI Chat • Ollama — tkinter edition
 
 import base64
 import datetime
+import hashlib
 import json
 import os
 import queue
 import re
+import shutil
+import struct
+import subprocess
 import sys
 import threading
 import time
@@ -37,6 +44,9 @@ import urllib.error
 import urllib.request
 import uuid
 import webbrowser
+import xml.etree.ElementTree as ET
+import zipfile
+import zlib
 from pathlib import Path
 
 import tkinter as tk
@@ -209,10 +219,266 @@ def api_message(m):
         content += (f"\n\n--- ไฟล์แนบ: {f['name']}{note} ---\n{f['text']}\n"
                     f"--- จบไฟล์ {f['name']} ---")
     out = {"role": m["role"], "content": content.strip()}
-    images = [img["data"] for img in m.get("images") or []]
+    images = [b for b in (image_b64(img) for img in m.get("images") or []) if b]
     if images:
         out["images"] = images
     return out
+
+
+# ---------------------------------------------------------------- documents
+W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def read_docx(path):
+    """ดึงข้อความจาก .docx (ย่อหน้า + ตารางแบบ Markdown) ด้วย zipfile/xml ล้วน"""
+    with zipfile.ZipFile(path) as z:
+        root = ET.fromstring(z.read("word/document.xml"))
+
+    def para(p):
+        parts = []
+        for el in p.iter():
+            if el.tag == W_NS + "t":
+                parts.append(el.text or "")
+            elif el.tag == W_NS + "tab":
+                parts.append("\t")
+            elif el.tag in (W_NS + "br", W_NS + "cr"):
+                parts.append("\n")
+        return "".join(parts)
+
+    out = []
+
+    def walk(container):
+        for el in container:
+            if el.tag == W_NS + "p":
+                out.append(para(el))
+            elif el.tag == W_NS + "tbl":
+                rows = []
+                for tr in el.iter(W_NS + "tr"):
+                    cells = [" ".join(para(p) for p in tc.iter(W_NS + "p")).strip().replace("|", "\\|")
+                             for tc in tr.findall(W_NS + "tc")]
+                    rows.append("| " + " | ".join(cells) + " |")
+                    if len(rows) == 1:
+                        rows.append("|" + "---|" * len(cells))
+                out.append("\n".join(rows))
+            else:
+                walk(el)  # เช่น content control (w:sdt)
+
+    body = root.find(W_NS + "body")
+    walk(body if body is not None else root)
+    text = "\n".join(out).strip()
+    if not text:
+        raise ValueError("ไม่พบข้อความในไฟล์")
+    return text
+
+
+def read_pdf(path):
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        try:
+            from PyPDF2 import PdfReader
+        except ImportError:
+            raise ValueError("อ่าน PDF ต้องติดตั้ง pypdf ก่อน: pip install pypdf") from None
+    reader = PdfReader(str(path))
+    if reader.is_encrypted:
+        try:
+            reader.decrypt("")
+        except Exception:
+            raise ValueError("PDF มีรหัสผ่าน") from None
+    pages = []
+    for i, page in enumerate(reader.pages, 1):
+        text = (page.extract_text() or "").strip()
+        if text:
+            pages.append(f"[หน้า {i}]\n{text}")
+    if not pages:
+        raise ValueError("PDF นี้ไม่มีข้อความ (อาจเป็นภาพสแกน)")
+    return "\n\n".join(pages)
+
+
+def read_document(path):
+    ext = Path(path).suffix.lower()
+    if ext == ".docx":
+        return read_docx(path)
+    if ext == ".pdf":
+        return read_pdf(path)
+    if ext == ".doc":
+        raise ValueError("ไฟล์ .doc แบบเก่ายังไม่รองรับ ให้บันทึกเป็น .docx ก่อน")
+    return read_text_file(path)
+
+
+# ---------------------------------------------------------------- image store
+def image_dir():
+    return DATA_FILE.with_name(".local_ai_ollama_images")
+
+
+def image_ext(raw):
+    if raw.startswith(b"\xff\xd8"):
+        return ".jpg"
+    if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        return ".webp"
+    return ".png"
+
+
+def store_image(raw):
+    """เก็บรูปเป็นไฟล์ชื่อตาม hash (รูปเดียวกันเก็บครั้งเดียว) คืนชื่อไฟล์"""
+    name = hashlib.sha1(raw).hexdigest()[:20] + image_ext(raw)
+    folder = image_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / name
+    if not path.exists():
+        path.write_bytes(raw)
+    return name
+
+
+def image_b64(img):
+    if img.get("data"):  # ข้อมูลรุ่นเก่าที่ฝังรูปไว้ใน JSON
+        return img["data"]
+    try:
+        return base64.b64encode((image_dir() / img["file"]).read_bytes()).decode("ascii")
+    except (OSError, KeyError):
+        return None
+
+
+# ---------------------------------------------------------------- clipboard / drag-and-drop
+def png_encode(width, height, rgb_rows):
+    def chunk(tag, data):
+        return (struct.pack(">I", len(data)) + tag + data
+                + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF))
+    raw = b"".join(b"\x00" + row for row in rgb_rows)
+    return (b"\x89PNG\r\n\x1a\n"
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
+
+
+def dib_to_png(dib):
+    """แปลงรูปในคลิปบอร์ด Windows (CF_DIB: BITMAPINFO + พิกเซล 24/32 บิต) เป็น PNG"""
+    if len(dib) < 40:
+        return None
+    size, width, height, _planes, bpp, comp = struct.unpack_from("<IiiHHI", dib, 0)
+    colors = struct.unpack_from("<I", dib, 32)[0]
+    if bpp not in (24, 32) or comp not in (0, 3) or width <= 0 or height == 0:
+        return None
+    offset = size + (12 if comp == 3 and size == 40 else 0) + colors * 4
+    stride = (width * bpp + 31) // 32 * 4
+    bottom_up, height = height > 0, abs(height)
+    if len(dib) < offset + stride * height:
+        return None
+    step, rows = bpp // 8, []
+    for y in range(height):
+        start = offset + (height - 1 - y if bottom_up else y) * stride
+        src = dib[start:start + width * step]
+        row = bytearray(width * 3)
+        row[0::3], row[1::3], row[2::3] = src[2::step], src[1::step], src[0::step]  # BGR(A) → RGB
+        rows.append(bytes(row))
+    return png_encode(width, height, rows)
+
+
+def linux_clipboard_png():
+    for cmd in (["wl-paste", "--no-newline", "--type", "image/png"],
+                ["xclip", "-selection", "clipboard", "-t", "image/png", "-o"]):
+        if shutil.which(cmd[0]):
+            try:
+                out = subprocess.run(cmd, capture_output=True, timeout=3).stdout
+            except (OSError, subprocess.SubprocessError):
+                continue
+            if out.startswith(b"\x89PNG"):
+                return out
+    return None
+
+
+class WinShell:
+    """Windows API ผ่าน ctypes: อ่านรูป/ไฟล์จากคลิปบอร์ด และรับไฟล์ที่ลากมาวาง"""
+    CF_UNICODETEXT, CF_DIB, CF_HDROP = 13, 8, 15
+    WM_DROPFILES, GWLP_WNDPROC = 0x0233, -4
+
+    def __init__(self):
+        import ctypes
+        from ctypes import wintypes as wt
+        self.ct = ctypes
+        u, k, s = ctypes.windll.user32, ctypes.windll.kernel32, ctypes.windll.shell32
+        u.OpenClipboard.argtypes = [wt.HWND]
+        u.OpenClipboard.restype = wt.BOOL
+        u.CloseClipboard.argtypes = []
+        u.IsClipboardFormatAvailable.argtypes = [wt.UINT]
+        u.IsClipboardFormatAvailable.restype = wt.BOOL
+        u.GetClipboardData.argtypes = [wt.UINT]
+        u.GetClipboardData.restype = wt.HANDLE
+        k.GlobalLock.argtypes = [wt.HGLOBAL]
+        k.GlobalLock.restype = ctypes.c_void_p
+        k.GlobalUnlock.argtypes = [wt.HGLOBAL]
+        k.GlobalSize.argtypes = [wt.HGLOBAL]
+        k.GlobalSize.restype = ctypes.c_size_t
+        s.DragQueryFileW.argtypes = [wt.HANDLE, wt.UINT, wt.LPWSTR, wt.UINT]
+        s.DragQueryFileW.restype = wt.UINT
+        s.DragFinish.argtypes = [wt.HANDLE]
+        s.DragAcceptFiles.argtypes = [wt.HWND, wt.BOOL]
+        lresult = ctypes.c_ssize_t
+        self.WNDPROC = ctypes.WINFUNCTYPE(lresult, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
+        setter = getattr(u, "SetWindowLongPtrW", None) or u.SetWindowLongW
+        setter.argtypes = [wt.HWND, ctypes.c_int, ctypes.c_void_p]
+        setter.restype = ctypes.c_void_p
+        u.CallWindowProcW.argtypes = [ctypes.c_void_p, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM]
+        u.CallWindowProcW.restype = lresult
+        self.u, self.k, self.s, self.set_wndproc = u, k, s, setter
+        self._procs = []  # เก็บ callback ไว้ไม่ให้ถูก garbage collect
+
+    def _drop_files(self, hdrop):
+        names = []
+        for i in range(self.s.DragQueryFileW(hdrop, 0xFFFFFFFF, None, 0)):
+            length = self.s.DragQueryFileW(hdrop, i, None, 0)
+            buf = self.ct.create_unicode_buffer(length + 1)
+            self.s.DragQueryFileW(hdrop, i, buf, length + 1)
+            names.append(buf.value)
+        return names
+
+    def clipboard(self):
+        """("files", [path, ...]) / ("image", png) / (None, None) ถ้าเป็นข้อความหรือไม่มีอะไร"""
+        has = self.u.IsClipboardFormatAvailable
+        if not has(self.CF_HDROP) and (has(self.CF_UNICODETEXT) or not has(self.CF_DIB)):
+            return None, None  # มีข้อความ (เช่นคัดลอกจาก Excel/Word) → วางเป็นข้อความตามปกติ
+        for _ in range(10):
+            if self.u.OpenClipboard(None):
+                break
+            time.sleep(0.02)
+        else:
+            return None, None
+        try:
+            if has(self.CF_HDROP):
+                handle = self.u.GetClipboardData(self.CF_HDROP)
+                return ("files", self._drop_files(handle)) if handle else (None, None)
+            handle = self.u.GetClipboardData(self.CF_DIB)
+            ptr = self.k.GlobalLock(handle) if handle else None
+            if not ptr:
+                return None, None
+            try:
+                dib = self.ct.string_at(ptr, self.k.GlobalSize(handle))
+            finally:
+                self.k.GlobalUnlock(handle)
+            png = dib_to_png(dib)
+            return ("image", png) if png else (None, None)
+        finally:
+            self.u.CloseClipboard()
+
+    def accept_drops(self, hwnd, callback):
+        """ให้หน้าต่าง hwnd รับไฟล์ที่ลากมาวาง แล้วเรียก callback(paths) (ห้ามเรียก Tk ใน callback)"""
+        old = None
+
+        def proc(h, msg, wparam, lparam):
+            if msg == self.WM_DROPFILES:
+                files = []
+                try:
+                    files = self._drop_files(wparam)
+                    self.s.DragFinish(wparam)
+                except Exception:
+                    pass
+                callback(files)
+                return 0
+            return self.u.CallWindowProcW(old, h, msg, wparam, lparam)
+
+        wndproc = self.WNDPROC(proc)
+        self._procs.append(wndproc)
+        old = self.set_wndproc(hwnd, self.GWLP_WNDPROC, self.ct.cast(wndproc, self.ct.c_void_p))
+        self.s.DragAcceptFiles(hwnd, True)
 
 
 # ---------------------------------------------------------------- syntax highlight
@@ -333,6 +599,14 @@ class App:
         self._resize_job = None
         self.pending = []           # ไฟล์/รูปที่แนบไว้ รอส่งพร้อมข้อความถัดไป
         self.model_sizes = {}
+        self.editing = None         # {"chat", "index"} ตอนแก้ไขข้อความที่ส่งไปแล้ว
+        self._draft = None
+        self.shell = None
+        if sys.platform == "win32":
+            try:
+                self.shell = WinShell()
+            except Exception:
+                self.shell = None
 
         root.title(APP_TITLE)
         root.geometry("1180x760")
@@ -343,6 +617,14 @@ class App:
         self.setup_style()
         self.build_ui()
         self.bind_keys()
+        if self._migrated:
+            self.save()
+        if self.shell:
+            try:  # ลากไฟล์จาก Explorer มาวางที่ไหนก็ได้ในหน้าต่าง
+                self.shell.accept_drops(self.root.winfo_id(),
+                                        lambda files: self.call_ui(self.add_files, files))
+            except Exception:
+                pass
 
         self.ensure_chat()
         self.render_all()
@@ -543,6 +825,14 @@ class App:
         cw.pack(side="bottom", fill="x", padx=18, pady=(10, 12))
         tk.Frame(main, bg="#343538", height=1).pack(side="bottom", fill="x")
 
+        self.edit_bar = tk.Frame(cw, bg=C["thought_bg"])
+        tk.Label(self.edit_bar, text="✎ กำลังแก้ไขข้อความ — ส่งแล้วคำตอบเดิมและข้อความถัดจากนี้จะถูกแทนที่",
+                 fg=C["accent"], bg=C["thought_bg"], font=self.f_small, anchor="w").pack(
+            side="left", padx=(10, 4), pady=5)
+        cancel = tk.Label(self.edit_bar, text="ยกเลิก (Esc) ✕", fg=C["muted"], bg=C["thought_bg"],
+                          font=self.f_small, cursor="hand2")
+        cancel.pack(side="right", padx=10)
+        cancel.bind("<Button-1>", lambda e: self.cancel_edit())
         self.attach_bar = tk.Frame(cw, bg=C["bg"])
         comp = tk.Frame(cw, bg=C["composer"], highlightthickness=1,
                         highlightbackground="#505257", highlightcolor=C["accent"])
@@ -640,8 +930,8 @@ class App:
         self.prompt.bind("<Return>", self.on_enter)
         self.prompt.bind("<KP_Enter>", self.on_enter)
         self.prompt.bind("<KeyRelease>", lambda e: (self.resize_prompt(), self.update_placeholder()))
-        for ev in ("<<Paste>>", "<<Cut>>"):
-            self.prompt.bind(ev, lambda e: self.root.after(1, self.after_prompt_edit))
+        self.prompt.bind("<<Paste>>", self.on_prompt_paste)
+        self.prompt.bind("<<Cut>>", lambda e: self.root.after(1, self.after_prompt_edit))
         self.root.bind_all("<Control-KeyPress>", self.on_ctrl_key)
         self.root.bind_all("<Escape>", self.on_escape)
         self.root.bind_all("<Control-n>", lambda e: (self.new_chat(), "break")[1])
@@ -669,10 +959,30 @@ class App:
             pass
         except Exception as e:
             print("โหลดข้อมูลแชตไม่ได้:", e, file=sys.stderr)
+        self._migrated = False
         for c in st["chats"]:
             for m in c.get("messages", []):
                 m.pop("streaming", None)
+                for img in m.get("images") or []:
+                    if img.get("data"):  # ย้ายรูปที่ฝังใน JSON (รุ่นก่อน) ไปเก็บเป็นไฟล์
+                        try:
+                            img["file"] = store_image(base64.b64decode(img["data"]))
+                            del img["data"]
+                            self._migrated = True
+                        except Exception:
+                            pass
         return st
+
+    def gc_images(self):
+        """ลบไฟล์รูปที่ไม่มีแชตไหนใช้แล้ว"""
+        used = {img.get("file") for c in self.data["chats"] for m in c.get("messages", [])
+                for img in m.get("images") or []}
+        try:
+            for path in image_dir().iterdir():
+                if path.is_file() and path.name not in used:
+                    path.unlink()
+        except OSError:
+            pass
 
     def save(self):
         try:
@@ -697,6 +1007,7 @@ class App:
     def new_chat(self):
         if self.active:
             return
+        self.cancel_edit()
         chat = {"id": str(uuid.uuid4()), "title": "แชตใหม่", "messages": [], "updated": now_ms()}
         preset = (self.current() or {}).get("preset")
         if preset:
@@ -735,11 +1046,13 @@ class App:
         if not chat or not messagebox.askyesno("ลบแชต", f"ลบการสนทนา “{chat['title']}” หรือไม่?",
                                                parent=self.root):
             return
+        self.cancel_edit()
         self.data["chats"] = [c for c in self.data["chats"] if c["id"] != chat["id"]]
         if self.data["currentId"] == chat["id"]:
             self.data["currentId"] = self.data["chats"][0]["id"] if self.data["chats"] else None
         self.ensure_chat()
         self.save()
+        self.gc_images()
         self.render_all()
 
     # ------------------------------------------------------------ history
@@ -771,6 +1084,7 @@ class App:
             return
         cid = self.hist_ids[sel[0]]
         if cid != self.data.get("currentId"):
+            self.cancel_edit()
             self.data["currentId"] = cid
             self.save()
             self.render_all()
@@ -909,7 +1223,10 @@ class App:
             if content:
                 tag = self.dyn_tag("ucopy", lambda c=content: self.copy_text(c, "คัดลอกข้อความแล้ว"))
                 self.ins("⧉ คัดลอก", ("action", tag))
-                self.ins("\n", ("action",))
+                self.ins("     ", ("action",))
+            tag = self.dyn_tag("uedit", lambda k=i: self.start_edit(k))
+            self.ins("✎ แก้ไข", ("action", tag))
+            self.ins("\n", ("action",))
         else:
             name = m.get("model") or self.data["settings"].get("model") or "Local AI"
             self.ins("✦ " + name + "\n", ("ai_header",))
@@ -966,11 +1283,14 @@ class App:
     def thumbnail(self, img):
         """รูปย่อสำหรับแสดงในแชต (Tk แสดงได้เฉพาะ PNG — ไฟล์อื่นคืน None)"""
         data = img.get("data") or ""
-        key = (img.get("name"), len(data), data[-48:])
+        key = img.get("file") or (img.get("name"), len(data), data[-48:])
         if key not in self._thumbs:
             photo = None
             try:
-                full = tk.PhotoImage(data=data)
+                if img.get("file"):
+                    full = tk.PhotoImage(file=str(image_dir() / img["file"]))
+                else:
+                    full = tk.PhotoImage(data=data)
                 factor = -(-max(full.width(), full.height()) // 240)
                 photo = full.subsample(factor) if factor > 1 else full
             except tk.TclError:
@@ -1271,6 +1591,8 @@ class App:
     def on_escape(self, _e=None):
         if self.active:
             self.stop()
+        elif self.editing is not None:
+            self.cancel_edit()
 
     def on_model_change(self, _e=None):
         self.data["settings"]["model"] = self.model_var.get()
@@ -1750,40 +2072,136 @@ class App:
         for font, size in self._font_sizes:
             font.configure(size=max(5, round(size * scale)))
 
+    # ------------------------------------------------------------ edit sent message
+    def start_edit(self, index):
+        if self.active:
+            self.set_status("รอให้ตอบเสร็จ หรือกด Esc เพื่อหยุดก่อน")
+            return
+        chat = self.current()
+        if not chat or index >= len(chat["messages"]):
+            return
+        m = chat["messages"][index]
+        if self.editing is None:  # เก็บข้อความที่พิมพ์ค้างไว้ คืนให้ตอนยกเลิก
+            self._draft = (self.prompt.get("1.0", "end-1c"), list(self.pending))
+        self.editing = {"chat": chat["id"], "index": index}
+        self.prompt.delete("1.0", "end")
+        self.prompt.insert("1.0", m.get("content") or "")
+        self.pending = [{"kind": "file", "name": f["name"], "text": f["text"],
+                         "truncated": f.get("truncated", False)} for f in m.get("files") or []]
+        for img in m.get("images") or []:
+            data = image_b64(img)
+            if data:
+                self.pending.append({"kind": "image", "name": img["name"], "data": data})
+        self.render_attachments()
+        self.render_edit_bar()
+        self.after_prompt_edit()
+        self.prompt.focus_set()
+        self.prompt.mark_set("insert", "end-1c")
+
+    def cancel_edit(self):
+        if self.editing is None:
+            return
+        self.editing = None
+        text, pending = self._draft or ("", [])
+        self._draft = None
+        self.prompt.delete("1.0", "end")
+        self.prompt.insert("1.0", text)
+        self.pending = pending
+        self.render_attachments()
+        self.render_edit_bar()
+        self.after_prompt_edit()
+
+    def render_edit_bar(self):
+        bar = self.edit_bar
+        if self.editing is None:
+            bar.pack_forget()
+            return
+        if not bar.winfo_manager():
+            before = self.attach_bar if self.attach_bar.winfo_manager() else self.comp
+            bar.pack(fill="x", pady=(0, 6), before=before)
+
     # ------------------------------------------------------------ attachments
     def attach_files(self):
         exts = " ".join("*" + e for e in sorted(IMAGE_EXT))
         paths = filedialog.askopenfilenames(
             parent=self.root, title="แนบไฟล์หรือรูป",
-            filetypes=[("ไฟล์ข้อความและรูป", "*.txt *.md *.py *.js *.ts *.html *.css *.json "
+            filetypes=[("เอกสาร ข้อความ และรูป", "*.pdf *.docx *.txt *.md *.py *.js *.ts *.html *.css *.json "
                         "*.csv *.xml *.yaml *.yml *.sql *.log *.ini *.rb *.java *.c *.cpp *.h "
                         "*.cs *.go *.rs *.php *.sh *.bat " + exts),
-                       ("รูปภาพ", exts), ("ทุกไฟล์", "*.*")])
+                       ("PDF / Word", "*.pdf *.docx"), ("รูปภาพ", exts), ("ทุกไฟล์", "*.*")])
         for path in paths:
             self.add_attachment(path)
         self.prompt.focus_set()
 
     def add_attachment(self, path):
         p = Path(path)
+        if p.is_dir():
+            self.set_status(f"แนบโฟลเดอร์ไม่ได้: {p.name}")
+            return
         try:
             if p.suffix.lower() in IMAGE_EXT:
                 if p.stat().st_size > MAX_IMAGE_BYTES:
                     raise ValueError("รูปใหญ่เกิน 15 MB")
-                att = {"kind": "image", "name": p.name,
-                       "data": base64.b64encode(p.read_bytes()).decode("ascii")}
-            else:
-                text = read_text_file(p)
-                att = {"kind": "file", "name": p.name, "text": text[:MAX_FILE_CHARS],
-                       "truncated": len(text) > MAX_FILE_CHARS}
-        except (OSError, ValueError) as e:
+                self.add_image_bytes(p.read_bytes(), p.name)
+                return
+            if p.suffix.lower() in (".pdf", ".docx"):
+                self.set_status(f"กำลังอ่าน {p.name} ...")
+                self.root.update_idletasks()
+            text = read_document(p)
+        except Exception as e:
             self.set_status(f"แนบ {p.name} ไม่ได้: {e}")
             return
+        att = {"kind": "file", "name": p.name, "text": text[:MAX_FILE_CHARS],
+               "truncated": len(text) > MAX_FILE_CHARS}
         self.pending.append(att)
         self.render_attachments()
-        if att["kind"] == "image":
-            self.set_status("แนบรูปแล้ว • ต้องใช้โมเดลที่ดูรูปได้ เช่น llava, gemma3, qwen2.5vl")
-        elif att["truncated"]:
+        if att["truncated"]:
             self.set_status(f"ไฟล์ {p.name} ยาวเกินไป ส่งเฉพาะ {MAX_FILE_CHARS:,} ตัวอักษรแรก")
+        else:
+            self.set_status(f"แนบ {p.name} แล้ว ({len(text):,} ตัวอักษร)")
+
+    def add_image_bytes(self, raw, name):
+        if len(raw) > MAX_IMAGE_BYTES:
+            self.set_status(f"แนบ {name} ไม่ได้: รูปใหญ่เกิน 15 MB")
+            return
+        self.pending.append({"kind": "image", "name": name,
+                             "data": base64.b64encode(raw).decode("ascii")})
+        self.render_attachments()
+        self.set_status("แนบรูปแล้ว • ต้องใช้โมเดลที่ดูรูปได้ เช่น llava, gemma3, qwen2.5vl")
+
+    def add_files(self, paths):
+        for path in paths:
+            self.add_attachment(path)
+        self.prompt.focus_set()
+
+    def clipboard_attachment(self):
+        """รูปหรือไฟล์ในคลิปบอร์ด → ("image", png) / ("files", [...]) / (None, None)"""
+        if self.shell:
+            try:
+                return self.shell.clipboard()
+            except Exception:
+                return None, None
+        if sys.platform.startswith("linux"):
+            try:
+                if self.root.clipboard_get():
+                    return None, None  # มีข้อความ → วางตามปกติ
+            except tk.TclError:
+                pass
+            png = linux_clipboard_png()
+            if png:
+                return "image", png
+        return None, None
+
+    def on_prompt_paste(self, _e=None):
+        kind, data = self.clipboard_attachment()
+        if kind == "files":
+            self.add_files(data)
+            return "break"
+        if kind == "image":
+            self.add_image_bytes(data, f"clipboard-{datetime.datetime.now():%Y%m%d-%H%M%S}.png")
+            return "break"
+        self.root.after(1, self.after_prompt_edit)
+        return None
 
     def remove_attachment(self, att):
         self.pending = [a for a in self.pending if a is not att]
@@ -1838,7 +2256,17 @@ class App:
             if files:
                 user["files"] = [{k: a[k] for k in ("name", "text", "truncated")} for a in files]
             if images:
-                user["images"] = [{"name": a["name"], "data": a["data"]} for a in images]
+                try:
+                    user["images"] = [{"name": a["name"], "file": store_image(base64.b64decode(a["data"]))}
+                                      for a in images]
+                except OSError as e:
+                    self.set_status("บันทึกรูปไม่ได้: " + str(e))
+                    return
+            edit = self.editing
+            if edit and edit["chat"] == chat["id"] and edit["index"] < len(msgs):
+                del msgs[edit["index"]:]  # แทนที่ข้อความที่แก้ และทุกอย่างหลังจากนั้น
+            self.editing, self._draft = None, None
+            self.render_edit_bar()
             msgs.append(user)
             self.pending = []
             self.render_attachments()
@@ -1869,6 +2297,7 @@ class App:
         if s.get("think"):
             body["think"] = True
 
+        self.gc_images()
         self.gen += 1
         self.active = {"gen": self.gen, "stop": threading.Event(), "resp": None,
                        "msg": assistant, "in_think": False, "tagbuf": "", "seen": False}
