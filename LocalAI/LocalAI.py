@@ -8,7 +8,9 @@ Local AI Chat • Ollama — tkinter edition
   • แชตแบบ streaming กับ Ollama ในเครื่อง (/api/chat)
   • เลือก/โหลดรายชื่อโมเดล (/api/tags)
   • ประวัติแชต: ค้นหา เปลี่ยนชื่อ ลบ (บันทึกเป็นไฟล์ JSON ในโฟลเดอร์ home)
-  • แสดงผล Markdown (หัวข้อ, ลิสต์, โค้ดบล็อก, ตัวหนา/เอียง, ลิงก์, quote)
+  • แสดงผล Markdown (หัวข้อ, ลิสต์, ตาราง, โค้ดบล็อก, ตัวหนา/เอียง, ลิงก์, quote)
+  • แนบไฟล์ข้อความ/โค้ด และรูป (PNG/JPG/WEBP สำหรับโมเดลที่ดูรูปได้)
+  • คำตอบยาวไม่หน่วง: ระหว่าง stream วาดใหม่เฉพาะย่อหน้าท้าย
   • โหมด Thinking (field "thinking" และแท็ก <think>…</think>) แบบพับ/ขยายได้
   • ตอบใหม่, ส่งออก .md, คัดลอกคำตอบ/โค้ด, แสดง tokens และ tok/s
   • คีย์ลัด: Enter ส่ง • Shift+Enter ขึ้นบรรทัด • Esc หยุด • Ctrl+N แชตใหม่
@@ -18,6 +20,7 @@ Local AI Chat • Ollama — tkinter edition
 ใช้เฉพาะ Python standard library (ไม่ต้อง pip install อะไรเพิ่ม)
 """
 
+import base64
 import datetime
 import json
 import os
@@ -48,6 +51,7 @@ C = {
     "link": "#8ad3ff", "user_name": "#a2dafa", "active_row": "#303134",
     "composer": "#2e3032", "thought_bg": "#26272a", "thought_fg": "#b2b5b7",
     "quote": "#c9c9ce", "select": "#2f5545",
+    "table_head": "#36383c", "table_row": "#26282b", "table_alt": "#2c2e31",
 }
 
 DEFAULTS = {
@@ -61,6 +65,11 @@ INLINE_RE = re.compile(
 FENCE_RE = re.compile(r"^\s*```\s*([\w.+-]*)")
 LIST_RE = re.compile(r"^([-*]|\d+[.)])\s+(.+)")
 HOST_RE = re.compile(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", re.I)
+TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
+
+IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
+MAX_IMAGE_BYTES = 15 * 1024 * 1024
+MAX_FILE_CHARS = 200_000
 
 # keycode ของปุ่มตัวอักษร ใช้จับ Ctrl+C/V/X/A/N ตอนเปิดแป้นภาษาไทย (keysym จะเป็นอักษรไทย)
 if sys.platform == "win32":
@@ -74,6 +83,95 @@ EDIT_EVENTS = {"c": "<<Copy>>", "v": "<<Paste>>", "x": "<<Cut>>"}
 
 def now_ms():
     return int(time.time() * 1000)
+
+
+def inline_parts(text):
+    """แยก Markdown แบบ inline เป็น (ชนิด, ข้อความที่แสดง, url)"""
+    for part in INLINE_RE.split(text):
+        if not part:
+            continue
+        if part.startswith("`") and part.endswith("`") and len(part) > 2:
+            yield "inline_code", part[1:-1], None
+        elif part.startswith("**") and part.endswith("**") and len(part) > 4:
+            yield "bold", part[2:-2], None
+        elif part.startswith("~~") and part.endswith("~~") and len(part) > 4:
+            yield "strike", part[2:-2], None
+        elif part.startswith("*") and part.endswith("*") and len(part) > 2:
+            yield "italic", part[1:-1], None
+        elif part.startswith("[") and "](" in part and part.endswith(")"):
+            label, url = part[1:-1].split("](", 1)
+            yield "link", label, url
+        else:
+            yield None, part, None
+
+
+def plain_inline(text):
+    return "".join(shown for _, shown, _ in inline_parts(text))
+
+
+def split_row(line):
+    s = line.strip()
+    if s.startswith("|"):
+        s = s[1:]
+    if s.endswith("|") and not s.endswith("\\|"):
+        s = s[:-1]
+    return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", s)]
+
+
+def table_aligns(sep):
+    out = []
+    for c in split_row(sep):
+        if c.startswith(":") and c.endswith(":"):
+            out.append("center")
+        elif c.endswith(":"):
+            out.append("right")
+        else:
+            out.append("left")
+    return out
+
+
+def stable_cut(text, start=0):
+    """ตำแหน่งท้ายสุดที่ตัดข้อความ Markdown ได้โดยไม่กระทบการแสดงผล
+    (หลังบรรทัดว่างนอกโค้ดบล็อก หรือหลังบรรทัดปิดโค้ดบล็อก) — start ต้องเป็นจุดตัดเดิม"""
+    cut, pos, in_code = start, start, False
+    while True:
+        nl = text.find("\n", pos)
+        if nl < 0:
+            return cut
+        line = text[pos:nl]
+        if FENCE_RE.match(line):
+            in_code = not in_code
+            if not in_code:
+                cut = nl + 1
+        elif not in_code and not line.strip():
+            cut = nl + 1
+        pos = nl + 1
+
+
+def read_text_file(path):
+    raw = Path(path).read_bytes()
+    if b"\x00" in raw[:4096]:
+        raise ValueError("ไม่ใช่ไฟล์ข้อความ")
+    for enc in ("utf-8-sig", "cp874"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            pass
+    return raw.decode("latin-1")
+
+
+def api_message(m):
+    """แปลงข้อความในประวัติเป็นรูปแบบที่ส่งให้ Ollama (รวมไฟล์แนบและรูป)"""
+    content = m.get("content") or ""
+    for f in m.get("files") or []:
+        note = " (ตัดเหลือบางส่วน)" if f.get("truncated") else ""
+        content += (f"\n\n--- ไฟล์แนบ: {f['name']}{note} ---\n{f['text']}\n"
+                    f"--- จบไฟล์ {f['name']} ---")
+    out = {"role": m["role"], "content": content.strip()}
+    images = [img["data"] for img in m.get("images") or []]
+    if images:
+        out["images"] = images
+    return out
 
 
 def pick_font(candidates, fallback):
@@ -94,10 +192,17 @@ class App:
         self.q = queue.Queue()
         self.open_thoughts = set()
         self.hist_ids = []
-        self._dyn_tags, self._stream_tags = [], []
+        self._dyn_tags, self._stream_tags, self._tail_tags = [], [], []
         self._tag_target = self._dyn_tags
         self._tagn = 0
         self._pad = None
+        self._tail = None           # ส่วนของคำตอบที่วาดแล้ว ระหว่าง stream
+        self._dirty = False         # มีข้อความใหม่รอวาด
+        self._next_render = 0.0
+        self._thumbs = {}
+        self._content_w = None
+        self._resize_job = None
+        self.pending = []           # ไฟล์/รูปที่แนบไว้ รอส่งพร้อมข้อความถัดไป
 
         root.title(APP_TITLE)
         root.geometry("1180x760")
@@ -156,6 +261,10 @@ class App:
         s.configure("Ghost.TButton", background=C["side"], foreground=C["muted"],
                     bordercolor=C["side"], padding=(6, 4), font=self.f_small)
         s.map("Ghost.TButton", background=[("active", "#2a2b2e")], foreground=[("active", C["text"])])
+        s.configure("Attach.TButton", background=C["composer"], foreground=C["muted"],
+                    bordercolor=C["composer"], padding=(8, 6), font=self.f_small)
+        s.map("Attach.TButton", background=[("active", C["panel_hover"])],
+              foreground=[("active", C["text"])])
         s.configure("Top.TButton", background=C["bg"], foreground=C["text"],
                     bordercolor=C["bg"], padding=(8, 5))
         s.map("Top.TButton", background=[("active", C["panel"])])
@@ -283,6 +392,7 @@ class App:
         cw.pack(side="bottom", fill="x", padx=18, pady=(10, 12))
         tk.Frame(main, bg="#343538", height=1).pack(side="bottom", fill="x")
 
+        self.attach_bar = tk.Frame(cw, bg=C["bg"])
         comp = tk.Frame(cw, bg=C["composer"], highlightthickness=1,
                         highlightbackground="#505257", highlightcolor=C["accent"])
         comp.pack(fill="x")
@@ -295,6 +405,8 @@ class App:
         self.send_btn = ttk.Button(comp, text="ส่ง ↑", style="Accent.TButton", width=8,
                                    command=self.send_message)
         self.send_btn.pack(side="right", anchor="s", padx=9, pady=9)
+        ttk.Button(comp, text="＋ แนบไฟล์", style="Attach.TButton",
+                   command=self.attach_files).pack(side="right", anchor="s", pady=9)
         self.placeholder = tk.Label(comp, text="ถามอะไรก็ได้... (Enter เพื่อส่ง)",
                                     fg="#7d7f84", bg=C["composer"], font=self.f_base, cursor="xterm")
         self.placeholder.place(x=19, y=14)
@@ -357,6 +469,12 @@ class App:
         t.tag_configure("meta", font=self.f_small, foreground=C["muted"], spacing1=6)
         t.tag_configure("action", font=self.f_small, foreground=C["muted"], spacing1=4)
         t.tag_configure("gap", font=self.f_gap, spacing3=14)
+        t.tag_configure("attach", font=self.f_small, foreground=C["link"], spacing1=2, spacing3=2)
+        t.tag_configure("table_head", font=self.f_bold, background=C["table_head"],
+                        spacing1=4, spacing3=4)
+        t.tag_configure("table_row", background=C["table_row"], spacing1=3, spacing3=3)
+        t.tag_configure("table_alt", background=C["table_alt"], spacing1=3, spacing3=3)
+        t.tag_configure("table_end", font=self.f_gap, spacing3=4)
         t.tag_configure("center", justify="center")
         t.tag_configure("empty_title", font=self.f_empty, spacing3=6)
         t.tag_configure("empty_sub", foreground=C["muted"], spacing3=4)
@@ -513,14 +631,18 @@ class App:
     def ins(self, text, tags=()):
         self.msg.insert("end", text, tags)
 
-    def dyn_tag(self, prefix, callback):
+    def new_tag(self, prefix):
         name = f"{prefix}{self._tagn}"
         self._tagn += 1
+        self._tag_target.append(name)
+        return name
+
+    def dyn_tag(self, prefix, callback):
+        name = self.new_tag(prefix)
         t = self.msg
         t.tag_bind(name, "<Button-1>", lambda e: callback())
         t.tag_bind(name, "<Enter>", lambda e: t.configure(cursor="hand2"))
         t.tag_bind(name, "<Leave>", lambda e: t.configure(cursor="arrow"))
-        self._tag_target.append(name)
         return name
 
     def _clear_tags(self, lst):
@@ -538,7 +660,13 @@ class App:
         t.delete("1.0", "end")
         self._clear_tags(self._dyn_tags)
         self._clear_tags(self._stream_tags)
-        t.mark_unset("stream") if "stream" in t.mark_names() else None
+        self._clear_tags(self._tail_tags)
+        for mark in ("stream", "tail"):
+            if mark in t.mark_names():
+                t.mark_unset(mark)
+        self._tail = None
+        if len(self._thumbs) > 64:
+            self._thumbs.clear()
         chat = self.current()
         self.title_label.configure(text=(chat or {}).get("title", "แชตใหม่"))
         msgs = (chat or {}).get("messages", [])
@@ -560,17 +688,37 @@ class App:
             t.see("end")
 
     def render_stream(self):
+        """วาดคำตอบที่กำลัง stream: ย่อหน้าที่จบแล้วไม่ต้องวาดซ้ำ วาดใหม่เฉพาะส่วนท้าย"""
         t = self.msg
         chat = self.current()
         if "stream" not in t.mark_names() or not chat or not chat["messages"]:
             self.render_messages()
             return
+        m = chat["messages"][-1]
+        content = m.get("content") or ""
+        tail = self._tail
         near = self._near_bottom()
         t.configure(state="normal")
-        t.delete("stream", "end")
-        self._clear_tags(self._stream_tags)
-        self._tag_target = self._stream_tags
-        self.render_message(chat, len(chat["messages"]) - 1, chat["messages"][-1])
+        if (tail and "tail" in t.mark_names() and len(content) >= tail["done"]
+                and len(m.get("thinking") or "") == tail["think"]):
+            t.delete("tail", "end-1c")
+            self._clear_tags(self._tail_tags)
+            cut = stable_cut(content, tail["done"])
+            if cut > tail["done"]:
+                self._tag_target = self._stream_tags
+                self.render_markdown(content[tail["done"]:cut])
+                t.mark_set("tail", "end-1c")
+                tail["done"] = cut
+            self._tag_target = self._tail_tags
+            self.render_reply_rest(m, content[cut:])
+            self.ins("\n", ("gap",))
+        else:
+            t.delete("stream", "end-1c")
+            self._clear_tags(self._stream_tags)
+            self._clear_tags(self._tail_tags)
+            self._tail = None
+            self._tag_target = self._stream_tags
+            self.render_message(chat, len(chat["messages"]) - 1, m)
         self._tag_target = self._dyn_tags
         t.configure(state="disabled")
         if near:
@@ -581,10 +729,21 @@ class App:
         if is_user:
             self.ins("คุณ\n", ("user_header",))
             content = m.get("content") or ""
-            self.ins(" " + content.replace("\n", " \n ") + " \n", ("user",))
-            tag = self.dyn_tag("ucopy", lambda c=content: self.copy_text(c, "คัดลอกข้อความแล้ว"))
-            self.ins("⧉ คัดลอก", ("action", tag))
-            self.ins("\n", ("action",))
+            if content:
+                self.ins(" " + content.replace("\n", " \n ") + " \n", ("user",))
+            for f in m.get("files") or []:
+                note = "  (ตัดเหลือบางส่วน)" if f.get("truncated") else ""
+                self.ins("▤ " + f["name"] + note + "\n", ("attach",))
+            for img in m.get("images") or []:
+                photo = self.thumbnail(img)
+                if photo is not None:
+                    self.msg.image_create("end", image=photo, padx=2, pady=4)
+                    self.ins("\n")
+                self.ins("▣ " + img["name"] + "\n", ("attach",))
+            if content:
+                tag = self.dyn_tag("ucopy", lambda c=content: self.copy_text(c, "คัดลอกข้อความแล้ว"))
+                self.ins("⧉ คัดลอก", ("action", tag))
+                self.ins("\n", ("action",))
         else:
             name = m.get("model") or self.data["settings"].get("model") or "Local AI"
             self.ins("✦ " + name + "\n", ("ai_header",))
@@ -605,43 +764,108 @@ class App:
                     self.ins(m["thinking"].strip() + "\n", ("thought",))
                     self.ins("\n", ("gap",))
             content = m.get("content") or ""
-            if content:
-                self.render_markdown(content)
-            elif streaming and not m.get("thinking"):
-                self.ins("▍ กำลังสร้างคำตอบ...\n", ("meta",))
-            stats = m.get("stats")
-            if stats or m.get("interrupted"):
-                parts = []
-                if stats:
-                    parts.append(f"{stats.get('tokens', 0)} tokens · {stats.get('tps', 0):.1f} tok/s")
-                if m.get("interrupted"):
-                    parts.append("หยุดกลางคัน")
-                self.ins(" · ".join(parts) + "\n", ("meta",))
-            if not streaming:
-                tag = self.dyn_tag("copy", lambda c=content: self.copy_text(c, "คัดลอกคำตอบแล้ว"))
-                self.ins("⧉ คัดลอก", ("action", tag))
-                self.ins("\n", ("action",))
+            if streaming and content and self._tag_target is self._stream_tags:
+                # ส่วนที่จบย่อหน้าแล้วอยู่หน้า mark "tail" — render_stream จะวาดใหม่แค่หลัง mark
+                cut = stable_cut(content)
+                self.render_markdown(content[:cut])
+                self.msg.mark_set("tail", "end-1c")
+                self.msg.mark_gravity("tail", "left")
+                self._tail = {"done": cut, "think": len(m.get("thinking") or "")}
+                self._tag_target = self._tail_tags
+                content = content[cut:]
+            self.render_reply_rest(m, content)
         self.ins("\n", ("gap",))
+
+    def render_reply_rest(self, m, text):
+        """ส่วนท้ายของคำตอบ AI: เนื้อหา text + สถิติ + ปุ่มคัดลอก"""
+        streaming = m.get("streaming")
+        if text:
+            self.render_markdown(text)
+        elif streaming and not m.get("content") and not m.get("thinking"):
+            self.ins("▍ กำลังสร้างคำตอบ...\n", ("meta",))
+        stats = m.get("stats")
+        if stats or m.get("interrupted"):
+            parts = []
+            if stats:
+                parts.append(f"{stats.get('tokens', 0)} tokens · {stats.get('tps', 0):.1f} tok/s")
+            if m.get("interrupted"):
+                parts.append("หยุดกลางคัน")
+            self.ins(" · ".join(parts) + "\n", ("meta",))
+        if not streaming:
+            content = m.get("content") or ""
+            tag = self.dyn_tag("copy", lambda c=content: self.copy_text(c, "คัดลอกคำตอบแล้ว"))
+            self.ins("⧉ คัดลอก", ("action", tag))
+            self.ins("\n", ("action",))
+
+    def thumbnail(self, img):
+        """รูปย่อสำหรับแสดงในแชต (Tk แสดงได้เฉพาะ PNG — ไฟล์อื่นคืน None)"""
+        data = img.get("data") or ""
+        key = (img.get("name"), len(data), data[-48:])
+        if key not in self._thumbs:
+            photo = None
+            try:
+                full = tk.PhotoImage(data=data)
+                factor = -(-max(full.width(), full.height()) // 240)
+                photo = full.subsample(factor) if factor > 1 else full
+            except tk.TclError:
+                pass
+            self._thumbs[key] = photo
+        return self._thumbs[key]
 
     def render_inline(self, text, base=()):
         base = tuple(base)
-        for part in INLINE_RE.split(text):
-            if not part:
-                continue
-            if part.startswith("`") and part.endswith("`") and len(part) > 2:
-                self.ins(part[1:-1], base + ("inline_code",))
-            elif part.startswith("**") and part.endswith("**") and len(part) > 4:
-                self.ins(part[2:-2], base + ("bold",))
-            elif part.startswith("~~") and part.endswith("~~") and len(part) > 4:
-                self.ins(part[2:-2], base + ("strike",))
-            elif part.startswith("*") and part.endswith("*") and len(part) > 2:
-                self.ins(part[1:-1], base + ("italic",))
-            elif part.startswith("[") and "](" in part and part.endswith(")"):
-                label, url = part[1:-1].split("](", 1)
-                tag = self.dyn_tag("link", lambda u=url: webbrowser.open(u))
-                self.ins(label, base + ("link", tag))
-            else:
-                self.ins(part, base)
+        for kind, shown, url in inline_parts(text):
+            tags = base + ((kind,) if kind else ())
+            if url:
+                tags += (self.dyn_tag("link", lambda u=url: webbrowser.open(u)),)
+            self.ins(shown, tags)
+
+    def measure_inline(self, text, bold=False):
+        fonts = {"inline_code": self.f_mono, "bold": self.f_bold, "italic": self.f_italic}
+        base = self.f_bold if bold else self.f_base
+        return sum(fonts.get(kind, base).measure(shown) for kind, shown, _ in inline_parts(text))
+
+    def render_table(self, rows, aligns):
+        n = max(len(r) for r in rows)
+        rows = [r + [""] * (n - len(r)) for r in rows]
+        aligns = (aligns + ["left"] * n)[:n]
+        widths = [max(self.measure_inline(r[c], bold=k == 0) for k, r in enumerate(rows))
+                  for c in range(n)]
+        gap = 24
+        avail = self.msg.winfo_width() - 2 * (self._pad or 24) - 16
+        tsv = "\n".join("\t".join(plain_inline(c) for c in r) for r in rows)
+        if avail > 100 and sum(widths) + gap * n > avail:
+            # จอแคบเกินไป: แสดงแต่ละแถวเป็นรายการ "หัวคอลัมน์: ค่า"
+            for r in rows[1:]:
+                for c in range(n):
+                    if not r[c] and not rows[0][c]:
+                        continue
+                    self.ins("•  ", ("li",))
+                    self.render_inline(rows[0][c], ("li", "bold"))
+                    self.ins(": ", ("li",))
+                    self.render_inline(r[c], ("li",))
+                    self.ins("\n", ("li",))
+                self.ins("\n", ("table_end",))
+        else:
+            stops, x = [], 10
+            for c in range(n):
+                pos = {"left": x, "center": x + widths[c] // 2, "right": x + widths[c]}[aligns[c]]
+                stops += [str(pos), aligns[c]]
+                x += widths[c] + gap
+            stops += [str(x - gap // 2), "left"]
+            tabs = self.new_tag("tbl")
+            self.msg.tag_configure(tabs, tabs=stops, tabstyle="tabular")
+            for k, r in enumerate(rows):
+                style = "table_head" if k == 0 else ("table_alt" if k % 2 == 0 else "table_row")
+                base = (style, tabs)
+                for c in range(n):
+                    self.ins("\t", base)
+                    self.render_inline(r[c], base)
+                self.ins("\t", base)
+                self.ins("\n", (tabs,))
+        tag = self.dyn_tag("tcopy", lambda s=tsv: self.copy_text(s, "คัดลอกตารางแล้ว (วางใน Excel ได้)"))
+        self.ins("⧉ คัดลอกตาราง", ("action", tag))
+        self.ins("\n", ("code_end",))
 
     def render_markdown(self, text):
         in_code, code, lang = False, [], ""
@@ -655,7 +879,11 @@ class App:
             self.ins("⧉ คัดลอกโค้ด", ("action", tag))
             self.ins("\n", ("code_end",))
 
-        for line in text.split("\n"):
+        lines = text.split("\n")
+        i = 0
+        while i < len(lines):
+            line = lines[i]
+            i += 1
             fence = FENCE_RE.match(line)
             if fence:
                 if in_code:
@@ -669,6 +897,14 @@ class App:
                 continue
             trim = line.strip()
             if not trim:
+                continue
+            if "|" in trim and i < len(lines) and "|" in lines[i] and TABLE_SEP_RE.match(lines[i]):
+                rows, aligns = [split_row(trim)], table_aligns(lines[i])
+                i += 1
+                while i < len(lines) and "|" in lines[i] and lines[i].strip():
+                    rows.append(split_row(lines[i]))
+                    i += 1
+                self.render_table(rows, aligns)
                 continue
             h = re.match(r"^(#{1,6})\s+(.*)", trim)
             if h:
@@ -704,6 +940,20 @@ class App:
             self._pad = pad
             self.msg.configure(padx=pad)
             self.composer_wrap.pack_configure(padx=max(18, pad - 4))
+        # ความกว้างเนื้อหาเปลี่ยน → วาดตารางใหม่ให้พอดีจอ (หน่วงไว้ไม่ให้วาดถี่ตอนลากขยาย)
+        width = e.width - 2 * pad
+        if self._content_w is None or abs(width - self._content_w) > 30:
+            self._content_w = width
+            chat = self.current() or {}
+            if any("|" in (m.get("content") or "") for m in chat.get("messages", [])):
+                if self._resize_job:
+                    self.root.after_cancel(self._resize_job)
+                self._resize_job = self.root.after(200, self._rerender_after_resize)
+
+    def _rerender_after_resize(self):
+        self._resize_job = None
+        if not self.active:
+            self.render_messages()
 
     # ------------------------------------------------------------ misc UI
     def set_status(self, text):
@@ -727,7 +977,7 @@ class App:
                                    command=lambda: self.edit_action(self._menu_widget, "x"))
         self.edit_menu.add_command(label="⧉  คัดลอก", accelerator="Ctrl+C",
                                    command=lambda: self.edit_action(self._menu_widget, "c"))
-        self.edit_menu.add_command(label="📋  วาง", accelerator="Ctrl+V",
+        self.edit_menu.add_command(label="⎘  วาง", accelerator="Ctrl+V",
                                    command=lambda: self.edit_action(self._menu_widget, "v"))
         self.edit_menu.add_separator()
         self.edit_menu.add_command(label="▣  เลือกทั้งหมด", accelerator="Ctrl+A",
@@ -875,6 +1125,9 @@ class App:
         for m in c["messages"]:
             who = "คุณ" if m["role"] == "user" else (m.get("model") or "AI")
             txt += "## " + who + "\n\n" + (m.get("content") or "") + "\n\n"
+            names = [a["name"] for a in (m.get("files") or []) + (m.get("images") or [])]
+            if names:
+                txt += "> แนบ: " + ", ".join(names) + "\n\n"
         with open(path, "w", encoding="utf-8") as f:
             f.write(txt)
         self.set_status("ส่งออกแล้ว: " + path)
@@ -918,6 +1171,69 @@ class App:
         self.set_connection(True, f"เชื่อมต่อแล้ว · {len(models)} โมเดล")
         self.save()
 
+    # ------------------------------------------------------------ attachments
+    def attach_files(self):
+        exts = " ".join("*" + e for e in sorted(IMAGE_EXT))
+        paths = filedialog.askopenfilenames(
+            parent=self.root, title="แนบไฟล์หรือรูป",
+            filetypes=[("ไฟล์ข้อความและรูป", "*.txt *.md *.py *.js *.ts *.html *.css *.json "
+                        "*.csv *.xml *.yaml *.yml *.sql *.log *.ini *.rb *.java *.c *.cpp *.h "
+                        "*.cs *.go *.rs *.php *.sh *.bat " + exts),
+                       ("รูปภาพ", exts), ("ทุกไฟล์", "*.*")])
+        for path in paths:
+            self.add_attachment(path)
+        self.prompt.focus_set()
+
+    def add_attachment(self, path):
+        p = Path(path)
+        try:
+            if p.suffix.lower() in IMAGE_EXT:
+                if p.stat().st_size > MAX_IMAGE_BYTES:
+                    raise ValueError("รูปใหญ่เกิน 15 MB")
+                att = {"kind": "image", "name": p.name,
+                       "data": base64.b64encode(p.read_bytes()).decode("ascii")}
+            else:
+                text = read_text_file(p)
+                att = {"kind": "file", "name": p.name, "text": text[:MAX_FILE_CHARS],
+                       "truncated": len(text) > MAX_FILE_CHARS}
+        except (OSError, ValueError) as e:
+            self.set_status(f"แนบ {p.name} ไม่ได้: {e}")
+            return
+        self.pending.append(att)
+        self.render_attachments()
+        if att["kind"] == "image":
+            self.set_status("แนบรูปแล้ว • ต้องใช้โมเดลที่ดูรูปได้ เช่น llava, gemma3, qwen2.5vl")
+        elif att["truncated"]:
+            self.set_status(f"ไฟล์ {p.name} ยาวเกินไป ส่งเฉพาะ {MAX_FILE_CHARS:,} ตัวอักษรแรก")
+
+    def remove_attachment(self, att):
+        self.pending = [a for a in self.pending if a is not att]
+        self.render_attachments()
+
+    def render_attachments(self):
+        bar = self.attach_bar
+        for w in bar.winfo_children():
+            w.destroy()
+        if not self.pending:
+            bar.pack_forget()
+            return
+        for att in self.pending:
+            chip = tk.Frame(bar, bg=C["panel"], highlightthickness=1, highlightbackground=C["line"])
+            chip.pack(side="left", padx=(0, 6))
+            icon = "▣ " if att["kind"] == "image" else "▤ "
+            tk.Label(chip, text=icon + att["name"], fg=C["text"], bg=C["panel"],
+                     font=self.f_small).pack(side="left", padx=(8, 2), pady=3)
+            x = tk.Label(chip, text="✕", fg=C["muted"], bg=C["panel"], font=self.f_small,
+                         cursor="hand2")
+            x.pack(side="left", padx=(2, 6))
+            x.bind("<Button-1>", lambda e, a=att: self.remove_attachment(a))
+        bar.pack(fill="x", pady=(0, 6), before=self.comp)
+
+    @staticmethod
+    def pending_title(user):
+        names = [a["name"] for a in (user.get("files") or []) + (user.get("images") or [])]
+        return "ไฟล์: " + ", ".join(names) if names else "แชตใหม่"
+
     # ------------------------------------------------------------ chat
     def send_message(self, regenerate=False):
         if self.active:
@@ -935,14 +1251,24 @@ class App:
                 return
         else:
             text = self.prompt.get("1.0", "end-1c").strip()
-            if not text:
+            if not text and not self.pending:
                 return
-            msgs.append({"role": "user", "content": text})
+            user = {"role": "user", "content": text}
+            files = [a for a in self.pending if a["kind"] == "file"]
+            images = [a for a in self.pending if a["kind"] == "image"]
+            if files:
+                user["files"] = [{k: a[k] for k in ("name", "text", "truncated")} for a in files]
+            if images:
+                user["images"] = [{"name": a["name"], "data": a["data"]} for a in images]
+            msgs.append(user)
+            self.pending = []
+            self.render_attachments()
             self.prompt.delete("1.0", "end")
             self.resize_prompt()
             self.update_placeholder()
             if chat["title"] == "แชตใหม่":
-                chat["title"] = re.sub(r"\s+", " ", text)[:42]
+                first = text or self.pending_title(user)
+                chat["title"] = re.sub(r"\s+", " ", first)[:42]
         s = self.data["settings"]
         if not s.get("model"):
             self.set_status("ยังไม่มีโมเดล กรุณาติดตั้งโมเดลใน Ollama ก่อน")
@@ -952,8 +1278,7 @@ class App:
         chat["updated"] = now_ms()
         assistant = {"role": "assistant", "model": s["model"], "content": "",
                      "thinking": "", "streaming": True}
-        previous = [{"role": m["role"], "content": m.get("content") or ""}
-                    for m in msgs if m.get("role") in ("user", "assistant")]
+        previous = [api_message(m) for m in msgs if m.get("role") in ("user", "assistant")]
         msgs.append(assistant)
         mx = int(s.get("maxHistory") or 0)
         history = previous[-mx:] if mx > 0 else previous
@@ -1081,8 +1406,15 @@ class App:
                     changed = False
         except queue.Empty:
             pass
-        if changed and self.active:
+        if changed:
+            self._dirty = True
+        if self._dirty and self.active and time.monotonic() >= self._next_render:
+            # ถ้าวาดช้า (คำตอบยาว) ให้เว้นช่วงวาดนานขึ้น จะได้ไม่กินเวลาจนหน้าจอค้าง
+            started = time.monotonic()
             self.render_stream()
+            spent = time.monotonic() - started
+            self._next_render = started + spent * 4
+            self._dirty = False
         self.root.after(40, self.poll)
 
     def stop(self):
@@ -1101,6 +1433,7 @@ class App:
         self.finish()
 
     def finish(self):
+        self._dirty = False
         if self.active:
             self.flush_tagbuf()
             self.active["msg"]["streaming"] = False
