@@ -13,6 +13,7 @@ import time
 from ctypes import wintypes as wt
 from pathlib import Path
 
+sys.stdout.reconfigure(encoding="utf-8")  # คอนโซลของ runner เป็น cp1252 พิมพ์ภาษาไทยไม่ได้
 HOME = tempfile.mkdtemp()
 os.environ["USERPROFILE"] = HOME  # ไม่ให้ไปเขียนทับข้อมูลแชตจริง
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
