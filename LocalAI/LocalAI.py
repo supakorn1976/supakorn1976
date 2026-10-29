@@ -11,6 +11,10 @@ Local AI Chat • Ollama — tkinter edition
   • แสดงผล Markdown (หัวข้อ, ลิสต์, ตาราง, โค้ดบล็อก, ตัวหนา/เอียง, ลิงก์, quote)
   • แนบไฟล์ข้อความ/โค้ด และรูป (PNG/JPG/WEBP สำหรับโมเดลที่ดูรูปได้)
   • คำตอบยาวไม่หน่วง: ระหว่าง stream วาดใหม่เฉพาะย่อหน้าท้าย
+  • ไฮไลต์สีโค้ด (Python, JS/TS/Java/C/C#/Go/Rust/PHP, SQL, Shell, JSON)
+  • จัดการโมเดล: ดาวน์โหลดพร้อมแถบความคืบหน้า, ดูข้อมูล, ลบ
+  • บทบาท (System Prompt) หลายชุด เลือกแยกตามแชต
+  • ขยาย/ย่อตัวอักษร Ctrl + / Ctrl − / Ctrl 0 หรือ Ctrl + ล้อเมาส์
   • โหมด Thinking (field "thinking" และแท็ก <think>…</think>) แบบพับ/ขยายได้
   • ตอบใหม่, ส่งออก .md, คัดลอกคำตอบ/โค้ด, แสดง tokens และ tok/s
   • คีย์ลัด: Enter ส่ง • Shift+Enter ขึ้นบรรทัด • Esc หยุด • Ctrl+N แชตใหม่
@@ -54,10 +58,34 @@ C = {
     "table_head": "#36383c", "table_row": "#26282b", "table_alt": "#2c2e31",
 }
 
+DEFAULT_PRESETS = [
+    {"name": "ผู้ช่วยเขียนโค้ด",
+     "prompt": "คุณเป็นโปรแกรมเมอร์ผู้เชี่ยวชาญ ตอบเป็นภาษาไทย อธิบายสั้นกระชับ ให้โค้ดที่รันได้จริง"
+               "ในโค้ดบล็อกพร้อมระบุภาษา และชี้จุดที่ควรระวัง"},
+    {"name": "แปลไทย ↔ อังกฤษ",
+     "prompt": "คุณเป็นนักแปลมืออาชีพ ถ้าข้อความเป็นภาษาไทยให้แปลเป็นภาษาอังกฤษ ถ้าเป็นภาษาอื่น"
+               "ให้แปลเป็นภาษาไทย แปลให้เป็นธรรมชาติ รักษาความหมายและน้ำเสียงเดิม ตอบเฉพาะคำแปล"},
+    {"name": "วิศวกรโยธา/ชลประทาน",
+     "prompt": "คุณเป็นวิศวกรโยธาและวิศวกรชลประทานที่มีประสบการณ์ ตอบเป็นภาษาไทย อ้างอิงหลักการ"
+               "และมาตรฐานที่เกี่ยวข้อง (เช่น วสท., ACI, กรมชลประทาน) แสดงสูตร หน่วย และขั้นตอน"
+               "คำนวณให้ชัดเจน และระบุสมมติฐานที่ใช้"},
+    {"name": "สรุปเอกสาร",
+     "prompt": "สรุปเนื้อหาที่ได้รับเป็นภาษาไทย เริ่มด้วยใจความสำคัญ 1–2 ประโยค ตามด้วยประเด็นหลัก"
+               "เป็นข้อ ๆ และตัวเลขสำคัญ ไม่เพิ่มข้อมูลที่ไม่มีในต้นฉบับ"},
+]
+PRESET_DEFAULT = "ค่าเริ่มต้น (จากตั้งค่า)"
+PRESET_MANAGE = "✎ จัดการบทบาท..."
+
 DEFAULTS = {
     "host": "http://localhost:11434", "model": "", "systemPrompt": "",
     "temperature": 0.7, "numCtx": 8192, "maxHistory": 20, "think": False,
+    "presets": DEFAULT_PRESETS, "fontScale": 1.0,
 }
+
+SUGGESTED_MODELS = [
+    "llama3.2:3b", "qwen3:8b", "qwen2.5:7b", "gemma3:4b", "gemma3:12b", "deepseek-r1:8b",
+    "qwen2.5-coder:7b", "gpt-oss:20b", "llava:7b", "qwen2.5vl:7b", "mistral:7b", "phi4-mini",
+]
 
 INLINE_RE = re.compile(
     r"(`[^`\n]+`|\*\*[^*\n]+\*\*|~~[^~\n]+~~|\*[^*\n]+\*|\[[^\]]+\]\(https?://[^\s)]+\))"
@@ -72,17 +100,30 @@ MAX_IMAGE_BYTES = 15 * 1024 * 1024
 MAX_FILE_CHARS = 200_000
 
 # keycode ของปุ่มตัวอักษร ใช้จับ Ctrl+C/V/X/A/N ตอนเปิดแป้นภาษาไทย (keysym จะเป็นอักษรไทย)
+# และ Ctrl + / Ctrl − / Ctrl 0 สำหรับขยายตัวอักษร
 if sys.platform == "win32":
-    CTRL_KEYCODES = {65: "a", 67: "c", 86: "v", 88: "x", 78: "n"}
+    CTRL_KEYCODES = {65: "a", 67: "c", 86: "v", 88: "x", 78: "n",
+                     187: "+", 107: "+", 189: "-", 109: "-", 48: "0", 96: "0"}
 elif sys.platform == "darwin":
     CTRL_KEYCODES = {}
 else:
-    CTRL_KEYCODES = {38: "a", 54: "c", 55: "v", 53: "x", 57: "n"}
+    CTRL_KEYCODES = {38: "a", 54: "c", 55: "v", 53: "x", 57: "n",
+                     21: "+", 86: "+", 20: "-", 82: "-", 19: "0", 90: "0"}
+ZOOM_STEPS = {"+": 0.1, "-": -0.1, "0": 0}
 EDIT_EVENTS = {"c": "<<Copy>>", "v": "<<Paste>>", "x": "<<Cut>>"}
 
 
 def now_ms():
     return int(time.time() * 1000)
+
+
+def fmt_size(n):
+    if not n:
+        return "-"
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.0f} {unit}" if unit in ("B", "KB") else f"{n:.1f} {unit}"
+        n /= 1024
 
 
 def inline_parts(text):
@@ -174,6 +215,93 @@ def api_message(m):
     return out
 
 
+# ---------------------------------------------------------------- syntax highlight
+HL_ALIASES = {
+    "python": "python py python3 py3",
+    "clike": ("js javascript jsx mjs ts typescript tsx java c h cpp c++ cc hpp cs csharp go golang "
+              "rust rs php kotlin kt swift dart scala"),
+    "sql": "sql mysql postgres postgresql psql sqlite plsql tsql",
+    "shell": "sh bash shell zsh console powershell ps1 ps",
+    "json": "json jsonc",
+}
+HL_LANG = {alias: lang for lang, names in HL_ALIASES.items() for alias in names.split()}
+HL_KEYWORDS = {
+    "python": ("False None True and as assert async await break class continue def del elif else "
+               "except finally for from global if import in is lambda nonlocal not or pass raise "
+               "return try while with yield match case"),
+    "clike": ("abstract async await break case catch class const continue default delete do else "
+              "enum export extends false final finally fn for func function go if impl implements "
+              "import in instanceof interface let match mod mut new nil null package private "
+              "protected pub public return static struct super switch this throw throws trait true "
+              "try type typeof undefined use var void while yield"),
+    "sql": ("select from where and or not insert into values update set delete create table drop "
+            "alter add index view join left right inner outer full on as group by order having "
+            "limit offset distinct union all null is in like between case when then else end "
+            "primary key foreign references default exists asc desc with"),
+    "shell": ("if then else elif fi for while do done case esac in function return local export "
+              "echo exit set unset source cd"),
+    "json": "true false null",
+}
+HL_BUILTINS = {
+    "python": ("self cls print len range int str float bool list dict set tuple open isinstance "
+               "super enumerate zip map filter sorted min max sum abs round"),
+    "clike": ("int long short char float double bool boolean string String byte unsigned signed "
+              "size_t usize i32 i64 u8 u32 u64 f32 f64 console Math Object Array Promise"),
+    "sql": ("count sum avg min max coalesce int integer varchar text date timestamp boolean real "
+            "numeric decimal"),
+}
+HL_COMMENTS = {
+    "python": r"#[^\n]*",
+    "shell": r"#[^\n]*",
+    "clike": r"//[^\n]*|/\*[\s\S]*?(?:\*/|\Z)",
+    "sql": r"--[^\n]*|/\*[\s\S]*?(?:\*/|\Z)",
+}
+HL_STRINGS = {
+    "python": (r'(?<!\w)[rRbBuUfF]{0,2}(?:"""[\s\S]*?(?:"""|\Z)|' r"'''[\s\S]*?(?:'''|\Z)|"
+               r'"(?:\\.|[^"\\\n])*"|' r"'(?:\\.|[^'\\\n])*')"),
+    "clike": r'"(?:\\.|[^"\\\n])*"|' r"'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`",
+    "sql": r"'(?:''|[^'])*'|" r'"[^"\n]*"',
+    "shell": r'"(?:\\.|[^"\\])*"|' r"'[^']*'",
+    "json": r'"(?:\\.|[^"\\\n])*"',
+}
+
+
+def _hl_regex(lang):
+    words = lambda s: "|".join(map(re.escape, s.split()))
+    parts = []
+    if lang in HL_COMMENTS:
+        parts.append(f"(?P<com>{HL_COMMENTS[lang]})")
+    parts.append(f"(?P<str>{HL_STRINGS[lang]})")
+    if lang == "python":
+        parts.append(r"(?P<deco>^[ \t]*@[\w.]+)")
+    parts.append(r"(?P<num>\b(?:0[xX][0-9a-fA-F]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b)")
+    parts.append(rf"(?P<kw>\b(?:{words(HL_KEYWORDS[lang])})\b)")
+    if lang in HL_BUILTINS:
+        parts.append(rf"(?P<bi>\b(?:{words(HL_BUILTINS[lang])})\b)")
+    if lang != "json":
+        parts.append(r"(?P<fn>\b[A-Za-z_]\w*(?=\s*\())")
+    return re.compile("|".join(parts), re.M | (re.I if lang == "sql" else 0))
+
+
+HL_RULES = {lang: _hl_regex(lang) for lang in HL_KEYWORDS}
+
+
+def highlight(code, lang):
+    """แบ่งโค้ดเป็นชิ้น (ข้อความ, tag สี หรือ None) ตามภาษาในโค้ดบล็อก"""
+    rx = HL_RULES.get(HL_LANG.get((lang or "").lower()))
+    if rx is None:
+        yield code, None
+        return
+    pos = 0
+    for m in rx.finditer(code):
+        if m.start() > pos:
+            yield code[pos:m.start()], None
+        yield m.group(), "hl_" + m.lastgroup
+        pos = m.end()
+    if pos < len(code):
+        yield code[pos:], None
+
+
 def pick_font(candidates, fallback):
     families = set(tkfont.families())
     for name in candidates:
@@ -190,6 +318,7 @@ class App:
         self.active = None          # สถานะการตอบที่กำลัง stream อยู่
         self.gen = 0                # เลขรุ่นของงาน ใช้ทิ้งข้อความค้างจากงานที่ถูกหยุด
         self.q = queue.Queue()
+        self.ui_q = queue.Queue()   # งานจาก thread เบื้องหลังที่ต้องทำใน thread หลักของ Tk
         self.open_thoughts = set()
         self.hist_ids = []
         self._dyn_tags, self._stream_tags, self._tail_tags = [], [], []
@@ -203,6 +332,7 @@ class App:
         self._content_w = None
         self._resize_job = None
         self.pending = []           # ไฟล์/รูปที่แนบไว้ รอส่งพร้อมข้อความถัดไป
+        self.model_sizes = {}
 
         root.title(APP_TITLE)
         root.geometry("1180x760")
@@ -240,6 +370,10 @@ class App:
         self.f_empty = F(family=ui, size=22, weight="bold")
         self.f_mono = F(family=mono, size=10)
         self.f_gap = F(family=ui, size=6)
+        self._font_sizes = [(f, f.cget("size")) for f in (
+            self.f_base, self.f_bold, self.f_italic, self.f_small, self.f_label, self.f_header,
+            self.f_title, self.f_brand, self.f_h2, self.f_h3, self.f_empty, self.f_mono, self.f_gap)]
+        self.apply_font_scale()
 
     def setup_style(self):
         s = ttk.Style(self.root)
@@ -291,6 +425,8 @@ class App:
                     indicatorbackground=C["field"], indicatorforeground=C["accent_text"])
         s.map("TCheckbutton", indicatorbackground=[("selected", C["accent"])],
               background=[("active", C["panel"])])
+        s.configure("Horizontal.TProgressbar", background=C["accent"], troughcolor=C["field"],
+                    bordercolor=C["border"], lightcolor=C["accent"], darkcolor=C["accent"])
         s.configure("Horizontal.TScale", background=C["accent"], troughcolor=C["field"],
                     bordercolor=C["border"], lightcolor=C["accent"], darkcolor=C["accent"])
 
@@ -320,6 +456,15 @@ class App:
         self.model_box.bind("<<ComboboxSelected>>", self.on_model_change)
         self.refresh_btn = ttk.Button(inner, text="↻  โหลดรายชื่อโมเดลใหม่", command=self.refresh_models)
         self.refresh_btn.pack(fill="x", pady=(8, 0))
+        mrow = tk.Frame(inner, bg=C["side"])
+        mrow.pack(fill="x", pady=(4, 0))
+        ttk.Button(mrow, text="⬇ ดาวน์โหลดโมเดล", style="Ghost.TButton",
+                   command=self.open_pull).grid(row=0, column=0, columnspan=2, sticky="ew")
+        for col, (text, cmd) in enumerate((("ℹ ข้อมูลโมเดล", self.show_model_info),
+                                           ("× ลบโมเดล", self.delete_model))):
+            mrow.columnconfigure(col, weight=1, uniform="model")
+            ttk.Button(mrow, text=text, style="Ghost.TButton", command=cmd).grid(
+                row=1, column=col, sticky="ew")
 
         self._section(inner, "ค้นหาประวัติ")
         self.search_var = tk.StringVar()
@@ -385,6 +530,12 @@ class App:
                    command=self.export_md).pack(side="right", padx=(6, 20))
         ttk.Button(top, text="↻ ตอบใหม่", style="Small.TButton",
                    command=lambda: self.send_message(True)).pack(side="right")
+        self.preset_var = tk.StringVar()
+        self.preset_box = ttk.Combobox(top, textvariable=self.preset_var, state="readonly", width=24)
+        self.preset_box.pack(side="right", padx=(0, 10))
+        self.preset_box.bind("<<ComboboxSelected>>", self.on_preset_change)
+        tk.Label(top, text="บทบาท", fg=C["muted"], bg=C["bg"], font=self.f_small).pack(
+            side="right", padx=(0, 6))
         tk.Frame(main, bg="#36373b", height=1).pack(fill="x")
 
         # composer (pack ก่อน เพื่อให้ติดขอบล่าง)
@@ -397,7 +548,7 @@ class App:
                         highlightbackground="#505257", highlightcolor=C["accent"])
         comp.pack(fill="x")
         self.comp = comp
-        self.prompt = tk.Text(comp, height=2, wrap="word", bg=C["composer"], fg=C["text"],
+        self.prompt = tk.Text(comp, height=2, width=1, wrap="word", bg=C["composer"], fg=C["text"],
                               insertbackground=C["text"], bd=0, highlightthickness=0,
                               font=self.f_base, padx=10, pady=10, undo=True,
                               selectbackground=C["select"])
@@ -458,6 +609,10 @@ class App:
                         foreground="#e6e6e6", lmargin1=14, lmargin2=14, rmargin=14)
         t.tag_configure("code_lang", font=self.f_small, foreground=C["muted"], spacing1=6)
         t.tag_configure("code_end", spacing3=4)
+        for name, color in (("hl_kw", "#c586c0"), ("hl_str", "#ce9178"), ("hl_com", "#6a9955"),
+                            ("hl_num", "#b5cea8"), ("hl_bi", "#4ec9b0"), ("hl_fn", "#dcdcaa"),
+                            ("hl_deco", "#dcdcaa")):
+            t.tag_configure(name, foreground=color)
         t.tag_configure("inline_code", font=self.f_mono, background=C["inline_code"])
         t.tag_configure("bold", font=self.f_bold)
         t.tag_configure("italic", font=self.f_italic)
@@ -491,10 +646,17 @@ class App:
         self.root.bind_all("<Escape>", self.on_escape)
         self.root.bind_all("<Control-n>", lambda e: (self.new_chat(), "break")[1])
         self.root.bind_all("<Control-N>", lambda e: (self.new_chat(), "break")[1])
+        for seq, step in (("<Control-plus>", 0.1), ("<Control-equal>", 0.1), ("<Control-KP_Add>", 0.1),
+                          ("<Control-minus>", -0.1), ("<Control-KP_Subtract>", -0.1),
+                          ("<Control-Key-0>", 0), ("<Control-KP_0>", 0)):
+            self.root.bind_all(seq, lambda e, s=step: self.zoom(s))
+        self.msg.bind("<Control-MouseWheel>", lambda e: self.zoom(0.1 if e.delta > 0 else -0.1))
+        self.msg.bind("<Control-Button-4>", lambda e: self.zoom(0.1))
+        self.msg.bind("<Control-Button-5>", lambda e: self.zoom(-0.1))
 
     # ------------------------------------------------------------ data
     def load_data(self):
-        st = {"settings": dict(DEFAULTS), "chats": [], "currentId": None}
+        st = {"settings": json.loads(json.dumps(DEFAULTS)), "chats": [], "currentId": None}
         try:
             with open(DATA_FILE, encoding="utf-8") as f:
                 saved = json.load(f)
@@ -536,6 +698,9 @@ class App:
         if self.active:
             return
         chat = {"id": str(uuid.uuid4()), "title": "แชตใหม่", "messages": [], "updated": now_ms()}
+        preset = (self.current() or {}).get("preset")
+        if preset:
+            chat["preset"] = preset  # ใช้บทบาทเดียวกับแชตที่เปิดอยู่
         self.data["chats"].insert(0, chat)
         self.data["currentId"] = chat["id"]
         self.save()
@@ -622,6 +787,7 @@ class App:
 
     # ------------------------------------------------------------ rendering
     def render_all(self):
+        self.update_preset_box()
         self.render_history()
         self.render_messages()
 
@@ -873,8 +1039,10 @@ class App:
         def flush_code():
             if lang:
                 self.ins(lang + "\n", ("code_block", "code_lang"))
-            self.ins("\n".join(code) + "\n", ("code_block",))
             src = "\n".join(code)
+            for chunk, kind in highlight(src, lang):
+                self.ins(chunk, ("code_block", kind) if kind else ("code_block",))
+            self.ins("\n", ("code_block",))
             tag = self.dyn_tag("ccopy", lambda s=src: self.copy_text(s, "คัดลอกโค้ดแล้ว"))
             self.ins("⧉ คัดลอกโค้ด", ("action", tag))
             self.ins("\n", ("code_end",))
@@ -1050,7 +1218,7 @@ class App:
             self.set_status("✓ คัดลอกแล้ว")
 
     def on_ctrl_key(self, e):
-        """รองรับ Ctrl+A ทุกช่อง และ Ctrl+C/V/X/N เมื่อแป้นพิมพ์ไม่ใช่ภาษาอังกฤษ"""
+        """รองรับ Ctrl+A ทุกช่อง และ Ctrl+C/V/X/N/+/−/0 เมื่อแป้นพิมพ์ไม่ใช่ภาษาอังกฤษ"""
         ks = (e.keysym or "").lower()
         if ks in EDIT_EVENTS or ks == "n":
             return None  # แป้นภาษาอังกฤษ: tkinter จัดการเองอยู่แล้ว
@@ -1060,6 +1228,8 @@ class App:
         if key == "n":
             self.new_chat()
             return "break"
+        if key in ZOOM_STEPS:
+            return self.zoom(ZOOM_STEPS[key])
         if not self._is_editable(e.widget):
             return None
         self.edit_action(e.widget, key)
@@ -1145,9 +1315,10 @@ class App:
                 with urllib.request.urlopen(host + "/api/tags", timeout=8) as r:
                     data = json.loads(r.read().decode("utf-8"))
                 models = [x.get("name") for x in data.get("models", []) if x.get("name")]
-                self.root.after(0, self._apply_models, models, None)
+                self.model_sizes = {x.get("name"): x.get("size") for x in data.get("models", [])}
+                self.call_ui(self._apply_models, models, None)
             except Exception as e:
-                self.root.after(0, self._apply_models, None, e)
+                self.call_ui(self._apply_models, None, e)
         threading.Thread(target=work, daemon=True).start()
 
     def _apply_models(self, models, err):
@@ -1170,6 +1341,414 @@ class App:
         self.model_var.set(s["model"])
         self.set_connection(True, f"เชื่อมต่อแล้ว · {len(models)} โมเดล")
         self.save()
+
+    # ------------------------------------------------------------ model management
+    def api(self, path, body=None, method=None, timeout=30):
+        data = json.dumps(body).encode("utf-8") if body is not None else None
+        req = urllib.request.Request(self.host() + path, data=data, method=method,
+                                     headers={"Content-Type": "application/json"})
+        return urllib.request.urlopen(req, timeout=timeout)
+
+    @staticmethod
+    def http_error_text(e):
+        try:
+            return json.loads(e.read().decode("utf-8")).get("error") or f"HTTP {e.code}"
+        except Exception:
+            return f"HTTP {e.code}"
+
+    def _place_dialog(self, win):
+        win.update_idletasks()
+        x = self.root.winfo_rootx() + (self.root.winfo_width() - win.winfo_width()) // 2
+        y = self.root.winfo_rooty() + (self.root.winfo_height() - win.winfo_height()) // 3
+        win.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+        win.grab_set()
+        win.focus_set()
+
+    def _dialog(self, title, heading):
+        win = tk.Toplevel(self.root, bg=C["panel"])
+        win.title(title)
+        win.transient(self.root)
+        win.resizable(False, False)
+        body = tk.Frame(win, bg=C["panel"])
+        body.pack(fill="both", expand=True, padx=22, pady=18)
+        tk.Label(body, text=heading, fg=C["text"], bg=C["panel"], font=self.f_title,
+                 anchor="w").pack(fill="x")
+        return win, body
+
+    def _dlg_label(self, parent, text):
+        tk.Label(parent, text=text, fg="#d0d0d2", bg=C["panel"], font=self.f_small,
+                 anchor="w", justify="left").pack(fill="x", pady=(12, 4))
+
+    def show_model_info(self):
+        name = self.data["settings"].get("model")
+        if not name:
+            self.set_status("ยังไม่ได้เลือกโมเดล")
+            return
+
+        def work():
+            try:
+                with self.api("/api/show", {"model": name}) as r:
+                    info = json.loads(r.read().decode("utf-8"))
+                self.call_ui(self._model_info_window, name, info, None)
+            except urllib.error.HTTPError as e:
+                self.call_ui(self._model_info_window, name, None, self.http_error_text(e))
+            except Exception as e:
+                self.call_ui(self._model_info_window, name, None, str(e))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _model_info_window(self, name, info, err):
+        if err:
+            messagebox.showerror("ข้อมูลโมเดล", f"ดูข้อมูล {name} ไม่ได้: {err}", parent=self.root)
+            return
+        d = info.get("details") or {}
+        mi = info.get("model_info") or {}
+        ctx = next((v for k, v in mi.items() if k.endswith(".context_length")), None)
+        caps = {"completion": "แชต", "vision": "ดูรูปได้", "tools": "เรียกใช้เครื่องมือ",
+                "thinking": "โหมด Thinking", "embedding": "Embedding", "insert": "เติมโค้ด"}
+        rows = [
+            ("ชื่อ", name),
+            ("ขนาดไฟล์", fmt_size(self.model_sizes.get(name))),
+            ("ตระกูล", d.get("family") or "-"),
+            ("จำนวนพารามิเตอร์", d.get("parameter_size") or "-"),
+            ("Quantization", d.get("quantization_level") or "-"),
+            ("Context สูงสุด", f"{ctx:,} tokens" if isinstance(ctx, int) else "-"),
+            ("num_ctx ที่ตั้งไว้", f"{int(self.data['settings']['numCtx']):,} tokens"),
+            ("ความสามารถ", ", ".join(caps.get(c, c) for c in info.get("capabilities") or []) or "-"),
+            ("แก้ไขล่าสุด", (info.get("modified_at") or "-")[:10]),
+        ]
+        win, body = self._dialog("ข้อมูลโมเดล", "ℹ  ข้อมูลโมเดล")
+        grid = tk.Frame(body, bg=C["panel"])
+        grid.pack(fill="x", pady=(12, 0))
+        for r, (k, v) in enumerate(rows):
+            tk.Label(grid, text=k, fg=C["muted"], bg=C["panel"], font=self.f_small,
+                     anchor="w").grid(row=r, column=0, sticky="w", padx=(0, 18), pady=3)
+            tk.Label(grid, text=v, fg=C["text"], bg=C["panel"], font=self.f_base, anchor="w",
+                     wraplength=380, justify="left").grid(row=r, column=1, sticky="w", pady=3)
+        ttk.Button(body, text="ปิด", command=win.destroy).pack(side="right", pady=(18, 0))
+        win.bind("<Escape>", lambda e: (win.destroy(), "break")[1])
+        self._place_dialog(win)
+
+    def delete_model(self):
+        name = self.data["settings"].get("model")
+        if not name or self.active:
+            return
+        if not messagebox.askyesno("ลบโมเดล", f"ลบโมเดล “{name}” ออกจากเครื่องหรือไม่?\n"
+                                   "ถ้าจะใช้อีกต้องดาวน์โหลดใหม่", parent=self.root):
+            return
+
+        def work():
+            try:
+                with self.api("/api/delete", {"model": name}, method="DELETE"):
+                    pass
+                self.call_ui(self._after_delete, name, None)
+            except urllib.error.HTTPError as e:
+                self.call_ui(self._after_delete, name, self.http_error_text(e))
+            except Exception as e:
+                self.call_ui(self._after_delete, name, str(e))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _after_delete(self, name, err):
+        if err:
+            self.set_status(f"ลบ {name} ไม่ได้: {err}")
+            return
+        if self.data["settings"].get("model") == name:
+            self.data["settings"]["model"] = ""
+        self.set_status(f"ลบโมเดล {name} แล้ว")
+        self.refresh_models()
+
+    def open_pull(self):
+        win, body = self._dialog("ดาวน์โหลดโมเดล", "⬇  ดาวน์โหลดโมเดล")
+        self._dlg_label(body, "ชื่อโมเดล (เลือกหรือพิมพ์เอง • ดูทั้งหมดที่ ollama.com/library)")
+        name_var = tk.StringVar()
+        combo = ttk.Combobox(body, textvariable=name_var, values=SUGGESTED_MODELS, width=44)
+        combo.pack(fill="x")
+        bar = ttk.Progressbar(body, mode="determinate", maximum=100)
+        bar.pack(fill="x", pady=(16, 4))
+        status = tk.Label(body, text="ดาวน์โหลดค้างไว้แล้วกดใหม่ จะดาวน์โหลดต่อจากเดิม",
+                          fg=C["muted"], bg=C["panel"], font=self.f_small, anchor="w")
+        status.pack(fill="x")
+        foot = tk.Frame(body, bg=C["panel"])
+        foot.pack(fill="x", pady=(18, 0))
+        st = {"stop": None, "resp": None, "q": queue.Queue(), "speed": None}
+
+        def start(_e=None):
+            name = name_var.get().strip()
+            if not name or st["stop"] is not None:
+                return
+            st["stop"] = threading.Event()
+            st["speed"] = None
+            go.state(["disabled"])
+            combo.state(["disabled"])
+            bar.configure(value=0)
+            status.configure(text="กำลังเริ่ม...")
+            threading.Thread(target=self._pull_worker, args=(name, st), daemon=True).start()
+            poll()
+
+        def finish_run():
+            st["stop"] = None
+            go.state(["!disabled"])
+            combo.state(["!disabled"])
+
+        def poll():
+            if not win.winfo_exists():
+                return
+            try:
+                while True:
+                    kind, data = st["q"].get_nowait()
+                    if kind == "progress":
+                        status.configure(text=self._pull_text(data, st))
+                        if data.get("total"):
+                            bar.configure(value=100 * (data.get("completed") or 0) / data["total"])
+                    elif kind == "done":
+                        finish_run()
+                        bar.configure(value=100)
+                        status.configure(text=f"✓ ดาวน์โหลด {data} เสร็จแล้ว และเลือกใช้โมเดลนี้")
+                        self.data["settings"]["model"] = data if ":" in data else data + ":latest"
+                        self.refresh_models()
+                    elif kind == "error":
+                        finish_run()
+                        status.configure(text="⚠ " + data)
+            except queue.Empty:
+                pass
+            if st["stop"] is not None:
+                win.after(100, poll)
+
+        def close(_e=None):
+            if st["stop"] is not None:
+                if not messagebox.askyesno("ยกเลิกการดาวน์โหลด",
+                                           "หยุดดาวน์โหลดหรือไม่? (ครั้งหน้าจะดาวน์โหลดต่อจากเดิม)",
+                                           parent=win):
+                    return "break"
+                st["stop"].set()
+                try:
+                    st["resp"] and st["resp"].close()
+                except Exception:
+                    pass
+            win.destroy()
+            return "break"
+
+        go = ttk.Button(foot, text="ดาวน์โหลด", style="Accent.TButton", command=start)
+        go.pack(side="right")
+        ttk.Button(foot, text="ปิด", command=close).pack(side="right", padx=8)
+        combo.bind("<Return>", start)
+        win.bind("<Escape>", close)
+        win.protocol("WM_DELETE_WINDOW", close)
+        self._place_dialog(win)
+        combo.focus_set()
+
+    def _pull_worker(self, name, st):
+        q, stop = st["q"], st["stop"]
+        try:
+            with self.api("/api/pull", {"model": name, "stream": True}, timeout=3600) as resp:
+                st["resp"] = resp
+                for raw in resp:
+                    if stop.is_set():
+                        return
+                    line = raw.decode("utf-8", "replace").strip()
+                    if not line:
+                        continue
+                    obj = json.loads(line)
+                    if obj.get("error"):
+                        raise RuntimeError(obj["error"])
+                    if obj.get("status") == "success":
+                        q.put(("done", name))
+                        return
+                    q.put(("progress", obj))
+            q.put(("error", "การเชื่อมต่อสิ้นสุดก่อนดาวน์โหลดเสร็จ"))
+        except urllib.error.HTTPError as e:
+            q.put(("error", self.http_error_text(e)))
+        except Exception as e:
+            if not stop.is_set():
+                q.put(("error", str(e)))
+
+    @staticmethod
+    def _pull_text(obj, st):
+        s = obj.get("status") or ""
+        names = {"pulling manifest": "กำลังดึงข้อมูลโมเดล", "verifying sha256 digest": "กำลังตรวจสอบไฟล์",
+                 "writing manifest": "กำลังบันทึก", "removing any unused layers": "กำลังเก็บกวาด"}
+        if s in names:
+            return names[s] + "..."
+        total, done = obj.get("total"), obj.get("completed") or 0
+        if not total:
+            return s
+        now, speed = time.monotonic(), ""
+        prev = st.get("speed")
+        if prev and prev[2] == obj.get("digest") and now - prev[0] >= 0.5:
+            rate = (done - prev[1]) / (now - prev[0])
+            st["speed"] = (now, done, obj.get("digest"), rate)
+        elif not prev or prev[2] != obj.get("digest"):
+            st["speed"] = (now, done, obj.get("digest"), None)
+        rate = st["speed"][3]
+        if rate and rate > 0:
+            speed = f" · {fmt_size(rate)}/s"
+        return f"กำลังดาวน์โหลด {100 * done / total:.0f}%  ({fmt_size(done)} / {fmt_size(total)}){speed}"
+
+    # ------------------------------------------------------------ presets
+    def preset_names(self):
+        return [p["name"] for p in self.data["settings"].get("presets") or []]
+
+    def chat_system_prompt(self, chat):
+        name = (chat or {}).get("preset")
+        for p in self.data["settings"].get("presets") or []:
+            if p["name"] == name:
+                return p.get("prompt") or ""
+        return self.data["settings"].get("systemPrompt") or ""
+
+    def update_preset_box(self):
+        names = self.preset_names()
+        self.preset_box.configure(values=[PRESET_DEFAULT] + names + [PRESET_MANAGE])
+        name = (self.current() or {}).get("preset")
+        self.preset_var.set(name if name in names else PRESET_DEFAULT)
+
+    def on_preset_change(self, _e=None):
+        value, chat = self.preset_var.get(), self.current()
+        if value == PRESET_MANAGE:
+            self.update_preset_box()
+            self.open_presets()
+            return
+        if chat:
+            if value == PRESET_DEFAULT:
+                chat.pop("preset", None)
+            else:
+                chat["preset"] = value
+            self.save()
+            self.set_status(f"แชตนี้ใช้บทบาท: {value}")
+        self.prompt.focus_set()
+
+    def open_presets(self):
+        work = [dict(p, _orig=p["name"]) for p in self.data["settings"].get("presets") or []]
+        win, body = self._dialog("จัดการบทบาท", "✎  จัดการบทบาท (System Prompt)")
+        tk.Label(body, text="แต่ละแชตเลือกบทบาทได้จากช่อง “บทบาท” ด้านบน", fg=C["muted"],
+                 bg=C["panel"], font=self.f_small, anchor="w").pack(fill="x", pady=(4, 0))
+        main = tk.Frame(body, bg=C["panel"])
+        main.pack(fill="both", expand=True, pady=(12, 0))
+        left = tk.Frame(main, bg=C["panel"])
+        left.pack(side="left", fill="y")
+        lb = tk.Listbox(left, bg=C["field"], fg=C["text"], font=self.f_base, width=22, height=12,
+                        bd=0, highlightthickness=1, highlightbackground=C["border"],
+                        selectbackground=C["accent"], selectforeground=C["accent_text"],
+                        activestyle="none", exportselection=False)
+        lb.pack(fill="y", expand=True)
+        btns = tk.Frame(left, bg=C["panel"])
+        btns.pack(fill="x", pady=(8, 0))
+        right = tk.Frame(main, bg=C["panel"])
+        right.pack(side="left", fill="both", expand=True, padx=(16, 0))
+        self._dlg_label(right, "ชื่อบทบาท")
+        name_var = tk.StringVar()
+        name_entry = ttk.Entry(right, textvariable=name_var, width=50)
+        name_entry.pack(fill="x")
+        self._dlg_label(right, "System Prompt")
+        sp = tk.Text(right, height=10, width=56, wrap="word", bg=C["field"], fg=C["text"],
+                     insertbackground=C["text"], bd=0, highlightthickness=1,
+                     highlightbackground=C["border"], highlightcolor=C["accent"],
+                     font=self.f_base, padx=8, pady=6, undo=True)
+        sp.pack(fill="both", expand=True)
+        cur = {"i": None}
+
+        def store():
+            i = cur["i"]
+            if i is None or i >= len(work):
+                return
+            work[i]["name"] = name_var.get().strip()
+            work[i]["prompt"] = sp.get("1.0", "end-1c").strip()
+            lb.delete(i)
+            lb.insert(i, work[i]["name"] or "(ไม่มีชื่อ)")
+
+        def load(i):
+            cur["i"] = i
+            state = "normal" if i is not None else "disabled"
+            name_var.set(work[i]["name"] if i is not None else "")
+            sp.configure(state="normal")
+            sp.delete("1.0", "end")
+            if i is not None:
+                sp.insert("1.0", work[i].get("prompt") or "")
+                lb.selection_clear(0, "end")
+                lb.selection_set(i)
+                lb.see(i)
+            sp.configure(state=state)
+            name_entry.state(["!disabled"] if i is not None else ["disabled"])
+
+        def on_select(_e=None):
+            sel = lb.curselection()
+            if sel and sel[0] != cur["i"]:
+                store()
+                load(sel[0])
+
+        def add():
+            store()
+            n, base = 1, "บทบาทใหม่"
+            names = {p["name"] for p in work}
+            while f"{base} {n}" in names:
+                n += 1
+            work.append({"name": f"{base} {n}", "prompt": "", "_orig": None})
+            lb.insert("end", work[-1]["name"])
+            load(len(work) - 1)
+            name_entry.focus_set()
+            name_entry.select_range(0, "end")
+
+        def remove():
+            i = cur["i"]
+            if i is None:
+                return
+            work.pop(i)
+            lb.delete(i)
+            cur["i"] = None
+            load(min(i, len(work) - 1) if work else None)
+
+        def do_save():
+            store()
+            names = [p["name"] for p in work]
+            if any(not n for n in names) or len(set(names)) != len(names):
+                messagebox.showwarning("ชื่อบทบาท", "ชื่อบทบาทต้องไม่ว่างและไม่ซ้ำกัน", parent=win)
+                return
+            if PRESET_DEFAULT in names or PRESET_MANAGE in names:
+                messagebox.showwarning("ชื่อบทบาท", "ใช้ชื่อนี้ไม่ได้", parent=win)
+                return
+            renamed = {p["_orig"]: p["name"] for p in work if p["_orig"]}
+            for chat in self.data["chats"]:
+                old = chat.get("preset")
+                if old is None:
+                    continue
+                if old in renamed:
+                    chat["preset"] = renamed[old]
+                else:
+                    chat.pop("preset", None)
+            self.data["settings"]["presets"] = [{"name": p["name"], "prompt": p["prompt"]}
+                                                for p in work]
+            self.save()
+            self.update_preset_box()
+            win.destroy()
+
+        ttk.Button(btns, text="＋ เพิ่ม", style="Small.TButton", command=add).pack(side="left")
+        ttk.Button(btns, text="× ลบ", style="Small.TButton", command=remove).pack(side="left", padx=6)
+        for p in work:
+            lb.insert("end", p["name"])
+        lb.bind("<<ListboxSelect>>", on_select)
+        foot = tk.Frame(body, bg=C["panel"])
+        foot.pack(fill="x", pady=(18, 0))
+        ttk.Button(foot, text="บันทึก", style="Accent.TButton", command=do_save).pack(side="right")
+        ttk.Button(foot, text="ยกเลิก", command=win.destroy).pack(side="right", padx=8)
+        win.bind("<Escape>", lambda e: (win.destroy(), "break")[1])
+        load(0 if work else None)
+        self._place_dialog(win)
+
+    # ------------------------------------------------------------ font size
+    def zoom(self, step):
+        s = self.data["settings"]
+        scale = 1.0 if step == 0 else min(2.0, max(0.7, (s.get("fontScale") or 1.0) + step))
+        s["fontScale"] = round(scale, 1)
+        self.apply_font_scale()
+        self.save()
+        self.set_status(f"ขนาดตัวอักษร {round(s['fontScale'] * 100)}%  (Ctrl + / Ctrl − / Ctrl 0)")
+        self.resize_prompt()
+        if not self.active:
+            self.render_messages()  # ตารางต้องวัดความกว้างใหม่
+        return "break"
+
+    def apply_font_scale(self):
+        scale = float(self.data["settings"].get("fontScale") or 1.0)
+        for font, size in self._font_sizes:
+            font.configure(size=max(5, round(size * scale)))
 
     # ------------------------------------------------------------ attachments
     def attach_files(self):
@@ -1282,7 +1861,7 @@ class App:
         msgs.append(assistant)
         mx = int(s.get("maxHistory") or 0)
         history = previous[-mx:] if mx > 0 else previous
-        sp = (s.get("systemPrompt") or "").strip()
+        sp = self.chat_system_prompt(chat).strip()
         body = {"model": s["model"],
                 "messages": ([{"role": "system", "content": sp}] if sp else []) + history,
                 "stream": True,
@@ -1374,7 +1953,17 @@ class App:
             a["msg"]["thinking" if a["in_think"] else "content"] += a["tagbuf"]
             a["tagbuf"] = ""
 
+    def call_ui(self, fn, *args):
+        """เรียก fn(*args) ใน thread หลัก (ใช้จาก thread เบื้องหลัง แทน root.after)"""
+        self.ui_q.put((fn, args))
+
     def poll(self):
+        while True:
+            try:
+                fn, args = self.ui_q.get_nowait()
+            except queue.Empty:
+                break
+            fn(*args)
         changed = False
         try:
             while True:
@@ -1464,7 +2053,7 @@ class App:
         host_var = tk.StringVar(value=s["host"])
         ttk.Entry(body, textvariable=host_var, width=52).pack(fill="x")
 
-        label("System Prompt (กำหนดบทบาท AI)")
+        label("System Prompt เริ่มต้น (ใช้เมื่อแชตไม่ได้เลือกบทบาท)")
         sp = tk.Text(body, height=5, wrap="word", bg=C["field"], fg=C["text"],
                      insertbackground=C["text"], bd=0, highlightthickness=1,
                      highlightbackground=C["border"], highlightcolor=C["accent"],
@@ -1533,12 +2122,7 @@ class App:
         ttk.Button(foot, text="ยกเลิก", command=win.destroy).pack(side="right", padx=8)
         win.bind("<Escape>", lambda e: (win.destroy(), "break")[1])
 
-        win.update_idletasks()
-        x = self.root.winfo_rootx() + (self.root.winfo_width() - win.winfo_width()) // 2
-        y = self.root.winfo_rooty() + (self.root.winfo_height() - win.winfo_height()) // 3
-        win.geometry(f"+{max(x, 0)}+{max(y, 0)}")
-        win.grab_set()
-        win.focus_set()
+        self._place_dialog(win)
 
 
 def main():
